@@ -14,9 +14,13 @@ from pyspark.sql.types import (
     TimestampType,
 )
 from datetime import datetime
+from pathlib import Path
+import sys
+
+# Ensure src/spark_jobs is importable regardless of pytest working directory
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bronze_to_silver import parse_args, transform_bronze_to_silver
-
 
 SCHEMA = StructType(
     [
