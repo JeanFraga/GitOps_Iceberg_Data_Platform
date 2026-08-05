@@ -1,4 +1,4 @@
 pyspark==3.5.1
 # CI / dev tooling
 pytest>=8.0,<9
-ruff==0.9.4
+ruff==0.16.1
