@@ -39,9 +39,8 @@ jobs:
       - name: Resolve Terraform variables
         env:
           INPUT_PROJECT_ID: ${{ env.TF_VAR_project_id }}
-          AUTH_PROJECT_ID: ${{ env.GOOGLE_CLOUD_PROJECT }}
         run: |
-          project_id="${INPUT_PROJECT_ID:-$AUTH_PROJECT_ID}"
+          project_id="${INPUT_PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
           if [ -z "$project_id" ]; then
             echo "TF_VAR_project_id is not set. Configure secrets.GCP_PROJECT_ID, vars.GCP_PROJECT_ID, or ensure GCP auth exposes GOOGLE_CLOUD_PROJECT." >&2
             exit 1
