@@ -6,6 +6,6 @@ nyc_taxi_gold:
       method: oauth            # use service-account in CI (set GOOGLE_APPLICATION_CREDENTIALS)
       project: "{{ env_var('GCP_PROJECT_ID') }}"
       dataset: gold_star_schema
-      location: us-central1
+      location: us-east1
       threads: 4
       timeout_seconds: 300

@@ -1,14 +1,3 @@
-{{
-  config(
-    materialized='external',
-    options={
-      'format': 'ICEBERG',
-      'uris': ['gs://' ~ env_var('GCP_PROJECT_ID') ~ '-iceberg-warehouse/warehouse/gold/dim_locations/metadata/v1.metadata.json'],
-      'connection_id': 'us-central1.iceberg-gcs-conn'
-    }
-  )
-}}
-
 /*
   Dimension table for TLC Taxi Zone locations.
   In a full implementation this would join the TLC zone lookup CSV

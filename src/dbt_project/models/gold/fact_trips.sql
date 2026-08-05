@@ -1,14 +1,3 @@
-{{
-  config(
-    materialized='external',
-    options={
-      'format': 'ICEBERG',
-      'uris': ['gs://' ~ env_var('GCP_PROJECT_ID') ~ '-iceberg-warehouse/warehouse/gold/fact_trips/metadata/v1.metadata.json'],
-      'connection_id': 'us-central1.iceberg-gcs-conn'
-    }
-  )
-}}
-
 SELECT
     FARM_FINGERPRINT(
         CONCAT(

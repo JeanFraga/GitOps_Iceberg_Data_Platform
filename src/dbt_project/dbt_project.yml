@@ -19,5 +19,4 @@ clean-targets:
 models:
   nyc_taxi_gold:
     gold:
-      +materialized: table  # overridden per model via config()
-      +schema: gold_star_schema
+      +materialized: table

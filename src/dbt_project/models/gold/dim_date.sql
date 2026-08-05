@@ -1,14 +1,3 @@
-{{
-  config(
-    materialized='external',
-    options={
-      'format': 'ICEBERG',
-      'uris': ['gs://' ~ env_var('GCP_PROJECT_ID') ~ '-iceberg-warehouse/warehouse/gold/dim_date/metadata/v1.metadata.json'],
-      'connection_id': 'us-central1.iceberg-gcs-conn'
-    }
-  )
-}}
-
 SELECT DISTINCT
     DATE(tpep_pickup_datetime)                            AS date_day,
     EXTRACT(YEAR  FROM tpep_pickup_datetime)              AS year,

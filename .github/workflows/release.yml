@@ -160,6 +160,20 @@ jobs:
             --project-id=${{ env.GCP_PROJECT_ID }} \
             --warehouse=${{ env.ICEBERG_WAREHOUSE }}
 
+      - name: Register Silver table in BigQuery
+        run: |
+          SILVER_METADATA_DIR=${{ env.ICEBERG_WAREHOUSE }}/silver/yellow_trips/metadata
+          # Iceberg's Hadoop catalog records the current metadata version here.
+          VERSION=$(gsutil cat "${SILVER_METADATA_DIR}/version-hint.text")
+          METADATA_URI="${SILVER_METADATA_DIR}/v${VERSION}.metadata.json"
+          echo "Registering Iceberg metadata: ${METADATA_URI}"
+
+          bq --location=${{ env.GCP_REGION }} query --use_legacy_sql=false \
+            "CREATE SCHEMA IF NOT EXISTS \`${{ env.GCP_PROJECT_ID }}.silver\`;
+             CREATE OR REPLACE EXTERNAL TABLE \`${{ env.GCP_PROJECT_ID }}.silver.yellow_trips\`
+             WITH CONNECTION \`${{ env.GCP_PROJECT_ID }}.${{ env.GCP_REGION }}.iceberg-gcs-conn\`
+             OPTIONS (format = 'ICEBERG', uris = ['${METADATA_URI}'])"
+
   # -----------------------------------------------------------------------
   # Job 4 – dbt run (Gold layer)
   # -----------------------------------------------------------------------
