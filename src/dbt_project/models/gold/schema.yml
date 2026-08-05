@@ -5,29 +5,60 @@ models:
     description: "Fact table containing one row per taxi trip with surrogate key"
     columns:
       - name: trip_id
-        description: "Surrogate key (FARM_FINGERPRINT of vendor_id + pickup datetime)"
+        description: "Surrogate key (FARM_FINGERPRINT of vendor_id + pickup datetime, the Silver-layer business key)"
         tests:
           - not_null
           - unique
       - name: vendor_id
+        description: "Provider that provided the record (1=Creative Mobile, 2=VeriFone)"
         tests:
           - not_null
+      - name: pickup_location_id
+        description: "TLC Taxi Zone where the meter was engaged"
+        tests:
+          - relationships:
+              to: ref('dim_locations')
+              field: location_id
+      - name: dropoff_location_id
+        description: "TLC Taxi Zone where the meter was disengaged"
+        tests:
+          - relationships:
+              to: ref('dim_locations')
+              field: location_id
       - name: total_amount
+        description: "Total amount charged to passengers"
         tests:
           - not_null
 
   - name: dim_locations
-    description: "Dimension table of unique TLC Taxi Zone location IDs"
+    description: "Dimension table of TLC Taxi Zone locations observed in the trip data, enriched from the seeded TLC zone lookup"
     columns:
       - name: location_id
+        description: "TLC Taxi Zone ID"
         tests:
           - not_null
           - unique
+      - name: borough
+        description: "NYC borough of the zone (NULL for IDs missing from the TLC lookup)"
+      - name: zone
+        description: "TLC zone name"
+      - name: service_zone
+        description: "TLC service zone grouping"
 
   - name: dim_date
     description: "Date dimension derived from Silver trip pickup datetimes"
     columns:
       - name: date_day
+        description: "Calendar date of the pickup"
+        tests:
+          - not_null
+          - unique
+
+seeds:
+  - name: taxi_zone_lookup
+    description: "Official TLC taxi zone lookup (https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv) with a snake_case header"
+    columns:
+      - name: location_id
         tests:
           - not_null
           - unique

@@ -8,6 +8,11 @@ output "bq_dataset_id" {
   value       = google_bigquery_dataset.iceberg_dataset.dataset_id
 }
 
+output "silver_dataset_id" {
+  description = "BigQuery dataset ID for the Silver BigLake external table"
+  value       = google_bigquery_dataset.silver_dataset.dataset_id
+}
+
 output "bq_connection_id" {
   description = "BigQuery BigLake connection ID"
   value       = google_bigquery_connection.gcs_connection.connection_id

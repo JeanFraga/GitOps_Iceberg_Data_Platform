@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: stg_yellow_trips
+    description: "Staging view over the Silver yellow_trips BigLake table; single place where source columns are renamed"
+    columns:
+      - name: vendor_id
+        description: "Provider that provided the record; part of the trip business key"
+        tests:
+          - not_null
+      - name: tpep_pickup_datetime
+        description: "Date and time when the meter was engaged; part of the trip business key"
+        tests:
+          - not_null

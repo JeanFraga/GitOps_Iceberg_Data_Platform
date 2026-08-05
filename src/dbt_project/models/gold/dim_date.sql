@@ -11,5 +11,5 @@ SELECT DISTINCT
         WHEN EXTRACT(DAYOFWEEK FROM tpep_pickup_datetime) IN (1, 7)
         THEN TRUE ELSE FALSE
     END                                                   AS is_weekend
-FROM {{ source('silver', 'yellow_trips') }}
+FROM {{ ref('stg_yellow_trips') }}
 WHERE tpep_pickup_datetime IS NOT NULL

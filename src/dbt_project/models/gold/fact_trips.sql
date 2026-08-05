@@ -6,8 +6,8 @@ SELECT
         )
     )                        AS trip_id,
     t.vendor_id,
-    t.pu_location_id         AS pickup_location_id,
-    t.do_location_id         AS dropoff_location_id,
+    t.pickup_location_id,
+    t.dropoff_location_id,
     t.tpep_pickup_datetime,
     t.tpep_dropoff_datetime,
     t.passenger_count,
@@ -24,4 +24,4 @@ SELECT
     t.payment_type,
     t.ratecode_id,
     t.store_and_fwd_flag
-FROM {{ source('silver', 'yellow_trips') }} t
+FROM {{ ref('stg_yellow_trips') }} t

@@ -7,7 +7,7 @@ sources:
     schema: silver
     tables:
       - name: yellow_trips
-        description: "De-duplicated and cleansed NYC Yellow Taxi trip records"
+        description: "De-duplicated and cleansed NYC Yellow Taxi trip records; unique on (vendor_id, tpep_pickup_datetime)"
         columns:
           - name: vendor_id
             description: "Provider that provided the record (1=Creative Mobile, 2=VeriFone)"
@@ -19,9 +19,31 @@ sources:
             description: "Number of passengers in the vehicle"
           - name: trip_distance
             description: "Elapsed trip distance in miles"
+          - name: ratecode_id
+            description: "Final rate code in effect at the end of the trip"
+          - name: store_and_fwd_flag
+            description: "Whether the trip record was held in vehicle memory before sending (Y/N)"
           - name: pu_location_id
             description: "TLC Taxi Zone where the meter was engaged"
           - name: do_location_id
             description: "TLC Taxi Zone where the meter was disengaged"
+          - name: payment_type
+            description: "How the passenger paid for the trip"
+          - name: fare_amount
+            description: "Time-and-distance fare calculated by the meter"
+          - name: extra
+            description: "Miscellaneous extras and surcharges"
+          - name: mta_tax
+            description: "MTA tax triggered by the metered rate"
+          - name: tip_amount
+            description: "Tip amount (credit card tips only)"
+          - name: tolls_amount
+            description: "Total amount of all tolls paid"
+          - name: improvement_surcharge
+            description: "Improvement surcharge assessed at flag drop"
           - name: total_amount
             description: "Total amount charged to passengers"
+          - name: congestion_surcharge
+            description: "NYS congestion surcharge"
+          - name: airport_fee
+            description: "Airport pickup fee (LaGuardia / JFK)"

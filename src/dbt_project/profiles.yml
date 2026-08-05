@@ -5,7 +5,9 @@ nyc_taxi_gold:
       type: bigquery
       method: oauth            # use service-account in CI (set GOOGLE_APPLICATION_CREDENTIALS)
       project: "{{ env_var('GCP_PROJECT_ID') }}"
-      dataset: gold_star_schema
-      location: us-east1
+      # Defaults must match infra/modules/bq_iceberg (bq_dataset_id) and the
+      # region used across the repo; override via env when they diverge.
+      dataset: "{{ env_var('DBT_DATASET', 'gold_star_schema') }}"
+      location: "{{ env_var('GCP_REGION', 'us-east1') }}"
       threads: 4
       timeout_seconds: 300
