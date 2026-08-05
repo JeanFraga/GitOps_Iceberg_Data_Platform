@@ -10,7 +10,7 @@ Performs:
 
 Usage:
     spark-submit \\
-      --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2 \\
+      --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.13:1.5.2 \\
       bronze_to_silver.py \\
       --project-id <GCP_PROJECT_ID> \\
       [--warehouse gs://<bucket>/warehouse] \\
@@ -28,7 +28,7 @@ from pyspark.sql.functions import col
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
-ICEBERG_RUNTIME = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2"
+ICEBERG_RUNTIME = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.13:1.5.2"
 GCS_CONNECTOR = "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.20"
 
 

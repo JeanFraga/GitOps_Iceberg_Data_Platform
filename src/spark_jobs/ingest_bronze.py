@@ -4,7 +4,7 @@ writes them as an Apache Iceberg table into the Bronze layer on GCS.
 
 Usage:
     spark-submit \\
-      --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2 \\
+      --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.13:1.5.2 \\
       ingest_bronze.py \\
       --project-id <GCP_PROJECT_ID> \\
       --source-uri gs://<bucket>/landing/yellow_tripdata_2023-01.parquet
@@ -15,6 +15,7 @@ import logging
 import sys
 
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import days
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ def ingest(warehouse_uri: str, source_uri: str) -> None:
         renamed.writeTo("gcs_catalog.bronze.yellow_trips")
         .tableProperty("write.format.default", "parquet")
         .tableProperty("write.parquet.compression-codec", "zstd")
-        .partitionedBy("days(tpep_pickup_datetime)")
+        .partitionedBy(days("tpep_pickup_datetime"))
         .createOrReplace()
     )
 
