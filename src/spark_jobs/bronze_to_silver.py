@@ -22,6 +22,7 @@ import logging
 import sys
 
 from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -50,6 +51,7 @@ def build_spark_session(warehouse_uri: str) -> SparkSession:
 
 def ensure_silver_table(spark: SparkSession) -> None:
     """Create the Silver table if it does not already exist."""
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS gcs_catalog.silver")
     spark.sql(
         """
         CREATE TABLE IF NOT EXISTS gcs_catalog.silver.yellow_trips (
@@ -79,6 +81,15 @@ def ensure_silver_table(spark: SparkSession) -> None:
     )
 
 
+def transform_bronze_to_silver(bronze_df: DataFrame) -> DataFrame:
+    """Apply Silver-layer filtering and de-duplication rules."""
+    return bronze_df.filter(
+        (col("trip_distance") > 0)
+        & (col("total_amount") > 0)
+        & (col("passenger_count").isNotNull())
+    ).dropDuplicates(["vendor_id", "tpep_pickup_datetime", "passenger_count"])
+
+
 def run_silver_pipeline(project_id: str, warehouse_uri: str, retain_snapshots: int) -> None:
     spark = build_spark_session(warehouse_uri)
 
@@ -92,14 +103,7 @@ def run_silver_pipeline(project_id: str, warehouse_uri: str, retain_snapshots: i
     # 3. Clean and Filter
     # ------------------------------------------------------------------ #
     logger.info("Cleaning and filtering …")
-    silver_df = (
-        bronze_df.filter(
-            (col("trip_distance") > 0)
-            & (col("total_amount") > 0)
-            & (col("passenger_count").isNotNull())
-        )
-        .dropDuplicates(["vendor_id", "tpep_pickup_datetime", "passenger_count"])
-    )
+    silver_df = transform_bronze_to_silver(bronze_df)
 
     # ------------------------------------------------------------------ #
     # 4. Ensure the Silver table exists
@@ -169,7 +173,10 @@ def parse_args(argv=None):
         default=5,
         help="Number of Iceberg snapshots to retain during expiration (default: 5)",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.retain_snapshots <= 0:
+        parser.error("--retain-snapshots must be greater than 0")
+    return args
 
 
 if __name__ == "__main__":
