@@ -6,7 +6,7 @@ metadata:
   labels:
     environment: dev
 data:
-  GCP_REGION: "us-central1"
+  GCP_REGION: "us-east1"
   BQ_DATASET: "gold_star_schema"
   ICEBERG_CATALOG: "gcs_catalog"
   BRONZE_TABLE: "gcs_catalog.bronze.yellow_trips"
