@@ -28,6 +28,8 @@ jobs:
   dbt-compile:
     name: dbt Compile
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: src/dbt_project
@@ -55,6 +57,8 @@ jobs:
   ingest-bronze:
     name: Ingest Bronze (Dataproc Serverless)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: dbt-compile
     if: github.ref == 'refs/heads/main'
 
@@ -97,6 +101,8 @@ jobs:
   silver-etl:
     name: Silver ETL (Dataproc Serverless)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: ingest-bronze
     if: github.ref == 'refs/heads/main'
 
@@ -134,6 +140,8 @@ jobs:
   dbt-run:
     name: dbt Run (Gold Layer)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs: silver-etl
     if: github.ref == 'refs/heads/main'
     defaults:
