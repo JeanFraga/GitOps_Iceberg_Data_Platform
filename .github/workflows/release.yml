@@ -46,10 +46,16 @@ jobs:
       - name: Install dbt
         run: pip install -r requirements.txt
 
+      - name: Install Spark job test dependencies
+        run: pip install -r ../spark_jobs/requirements.txt
+
       - name: dbt compile (parse check)
         env:
           GCP_PROJECT_ID: dummy-project   # only needs to exist for Jinja rendering
         run: dbt parse --profiles-dir .
+
+      - name: PySpark unit tests
+        run: pytest ../spark_jobs/tests/ -v
 
   # -----------------------------------------------------------------------
   # Job 2 – Submit Bronze ingestion Dataproc Serverless batch

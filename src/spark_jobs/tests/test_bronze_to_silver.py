@@ -15,6 +15,8 @@ from pyspark.sql.types import (
 )
 from datetime import datetime
 
+from bronze_to_silver import parse_args, transform_bronze_to_silver
+
 
 SCHEMA = StructType(
     [
@@ -54,12 +56,7 @@ class TestFiltering:
             (1, datetime(2023, 1, 1, 11, 0), datetime(2023, 1, 1, 11, 30), 1.0, 5.0, 100, 200, 1, 20.0),
         ]
         df = make_df(spark, rows)
-        from pyspark.sql.functions import col
-        result = df.filter(
-            (col("trip_distance") > 0) &
-            (col("total_amount") > 0) &
-            col("passenger_count").isNotNull()
-        )
+        result = transform_bronze_to_silver(df)
         assert result.count() == 1
 
     def test_removes_zero_amount(self, spark):
@@ -68,12 +65,7 @@ class TestFiltering:
             (1, datetime(2023, 1, 1, 11, 0), datetime(2023, 1, 1, 11, 30), 1.0, 5.0, 100, 200, 1, 20.0),
         ]
         df = make_df(spark, rows)
-        from pyspark.sql.functions import col
-        result = df.filter(
-            (col("trip_distance") > 0) &
-            (col("total_amount") > 0) &
-            col("passenger_count").isNotNull()
-        )
+        result = transform_bronze_to_silver(df)
         assert result.count() == 1
 
     def test_removes_null_passenger_count(self, spark):
@@ -82,12 +74,7 @@ class TestFiltering:
             (1, datetime(2023, 1, 1, 11, 0), datetime(2023, 1, 1, 11, 30), 1.0,  5.0, 100, 200, 1, 20.0),
         ]
         df = make_df(spark, rows)
-        from pyspark.sql.functions import col
-        result = df.filter(
-            (col("trip_distance") > 0) &
-            (col("total_amount") > 0) &
-            col("passenger_count").isNotNull()
-        )
+        result = transform_bronze_to_silver(df)
         assert result.count() == 1
 
     def test_keeps_valid_rows(self, spark):
@@ -96,12 +83,7 @@ class TestFiltering:
             (2, datetime(2023, 1, 2, 12, 0), datetime(2023, 1, 2, 12, 45), 1.0, 7.2, 150, 250, 2, 30.0),
         ]
         df = make_df(spark, rows)
-        from pyspark.sql.functions import col
-        result = df.filter(
-            (col("trip_distance") > 0) &
-            (col("total_amount") > 0) &
-            col("passenger_count").isNotNull()
-        )
+        result = transform_bronze_to_silver(df)
         assert result.count() == 2
 
 
@@ -112,7 +94,7 @@ class TestDeduplication:
             (1, datetime(2023, 1, 1, 10, 0), datetime(2023, 1, 1, 10, 30), 1.0, 5.0, 100, 200, 1, 15.0),
         ]
         df = make_df(spark, rows)
-        result = df.dropDuplicates(["vendor_id", "tpep_pickup_datetime", "passenger_count"])
+        result = transform_bronze_to_silver(df)
         assert result.count() == 1
 
     def test_retains_distinct_rows(self, spark):
@@ -121,5 +103,11 @@ class TestDeduplication:
             (1, datetime(2023, 1, 1, 11, 0), datetime(2023, 1, 1, 11, 30), 2.0, 6.0, 100, 200, 1, 20.0),
         ]
         df = make_df(spark, rows)
-        result = df.dropDuplicates(["vendor_id", "tpep_pickup_datetime", "passenger_count"])
+        result = transform_bronze_to_silver(df)
         assert result.count() == 2
+
+
+class TestArgumentValidation:
+    def test_rejects_non_positive_retain_snapshots(self):
+        with pytest.raises(SystemExit):
+            parse_args(["--project-id", "demo-project", "--retain-snapshots", "0"])
