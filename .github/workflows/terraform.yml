@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'infra/**'
+  workflow_dispatch:
 
 # TF_VAR_* are set in the "Resolve Terraform variables" step, not here:
 # a workflow-level env entry overrides $GITHUB_ENV in every later step.
