@@ -20,6 +20,15 @@ provider "google" {
   region  = var.region
 }
 
+# Required by the Dataproc Serverless batches in the release workflow.
+resource "google_project_service" "dataproc" {
+  project = var.project_id
+  service = "dataproc.googleapis.com"
+
+  # Leave the API enabled on destroy; other workloads in the project may rely on it.
+  disable_on_destroy = false
+}
+
 module "data_platform" {
   source = "../../modules/bq_iceberg"
 
