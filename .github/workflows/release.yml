@@ -21,6 +21,8 @@ env:
   GCP_REGION: us-east1
   # Pinned so runtime defaults cannot change Spark/Iceberg versions between runs.
   DATAPROC_RUNTIME_VERSION: "2.2"
+  # Must match the Spark 3.5 shipped by the pinned Dataproc runtime.
+  ICEBERG_SPARK_PACKAGE: "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2"
   ICEBERG_WAREHOUSE: gs://${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}-iceberg-warehouse/warehouse
 
 jobs:
@@ -88,6 +90,19 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve ingestion parameters
+        run: |
+          YEAR="${{ github.event.inputs.ingest_year || '2023' }}"
+          MONTH="${{ github.event.inputs.ingest_month || '1' }}"
+          SRC_FILE="yellow_tripdata_${YEAR}-$(printf '%02d' "${MONTH}").parquet"
+          echo "SRC_FILE=${SRC_FILE}" >> "$GITHUB_ENV"
+          echo "SOURCE_URI=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/landing/${SRC_FILE}" >> "$GITHUB_ENV"
+
+      - name: Stage TLC parquet to GCS
+        run: |
+          curl -fsSL "https://d37ci6vzurychx.cloudfront.net/trip-data/${SRC_FILE}" -o "${SRC_FILE}"
+          gsutil cp "${SRC_FILE}" "${SOURCE_URI}"
+
       - name: Upload PySpark job to GCS
         run: |
           gsutil cp src/spark_jobs/ingest_bronze.py \
@@ -95,21 +110,16 @@ jobs:
 
       - name: Submit Bronze ingestion batch
         run: |
-          YEAR=${{ github.event.inputs.ingest_year || '2023' }}
-          MONTH=${{ github.event.inputs.ingest_month || '1' }}
-
           gcloud dataproc batches submit pyspark \
             gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/ingest_bronze.py \
             --region=${{ env.GCP_REGION }} \
             --version=${{ env.DATAPROC_RUNTIME_VERSION }} \
             --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
-            --jars=gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar \
-            --properties="spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
+            --properties="spark.jars.packages=${{ env.ICEBERG_SPARK_PACKAGE }},spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
             -- \
             --project-id=${{ env.GCP_PROJECT_ID }} \
             --warehouse=${{ env.ICEBERG_WAREHOUSE }} \
-            --year=${YEAR} \
-            --month=${MONTH}
+            --source-uri=${SOURCE_URI}
 
   # -----------------------------------------------------------------------
   # Job 3 – Submit Silver ETL Dataproc Serverless batch
@@ -145,8 +155,7 @@ jobs:
             --region=${{ env.GCP_REGION }} \
             --version=${{ env.DATAPROC_RUNTIME_VERSION }} \
             --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
-            --jars=gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar \
-            --properties="spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
+            --properties="spark.jars.packages=${{ env.ICEBERG_SPARK_PACKAGE }},spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
             -- \
             --project-id=${{ env.GCP_PROJECT_ID }} \
             --warehouse=${{ env.ICEBERG_WAREHOUSE }}

@@ -1,5 +1,5 @@
 """
-Bronze ingestion job: downloads NYC TLC Yellow Taxi Parquet files and
+Bronze ingestion job: reads NYC TLC Yellow Taxi Parquet files staged on GCS and
 writes them as an Apache Iceberg table into the Bronze layer on GCS.
 
 Usage:
@@ -7,7 +7,7 @@ Usage:
       --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2 \\
       ingest_bronze.py \\
       --project-id <GCP_PROJECT_ID> \\
-      --year 2023 --month 1
+      --source-uri gs://<bucket>/landing/yellow_tripdata_2023-01.parquet
 """
 
 import argparse
@@ -18,9 +18,6 @@ from pyspark.sql import SparkSession
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
-
-# Public TLC data URL pattern
-TLC_BASE_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data"
 
 
 def build_spark_session(warehouse_uri: str) -> SparkSession:
@@ -37,13 +34,12 @@ def build_spark_session(warehouse_uri: str) -> SparkSession:
     )
 
 
-def ingest(project_id: str, warehouse_uri: str, year: int, month: int) -> None:
+def ingest(warehouse_uri: str, source_uri: str) -> None:
     spark = build_spark_session(warehouse_uri)
 
-    url = f"{TLC_BASE_URL}/yellow_tripdata_{year}-{month:02d}.parquet"
-    logger.info("Reading source parquet: %s", url)
+    logger.info("Reading source parquet: %s", source_uri)
 
-    raw_df = spark.read.parquet(url)
+    raw_df = spark.read.parquet(source_uri)
 
     # Normalise column names to snake_case
     renamed = raw_df.toDF(*[c.lower().replace(" ", "_") for c in raw_df.columns])
@@ -60,7 +56,7 @@ def ingest(project_id: str, warehouse_uri: str, year: int, month: int) -> None:
         .createOrReplace()
     )
 
-    logger.info("Bronze ingestion complete for %d-%02d.", year, month)
+    logger.info("Bronze ingestion complete from %s.", source_uri)
     spark.stop()
 
 
@@ -68,12 +64,17 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Ingest NYC Taxi data into Bronze Iceberg layer")
     parser.add_argument("--project-id", required=True)
     parser.add_argument("--warehouse", default=None)
-    parser.add_argument("--year", type=int, default=2023)
-    parser.add_argument("--month", type=int, default=1)
-    return parser.parse_args(argv)
+    parser.add_argument("--source-uri", required=True)
+    args = parser.parse_args(argv)
+
+    # Spark's Hadoop FS layer has no http(s) driver, so sources must be staged on GCS first.
+    if args.source_uri.startswith(("http://", "https://")):
+        parser.error("--source-uri must be a Spark-readable path such as gs://…, not an HTTP URL")
+
+    return args
 
 
 if __name__ == "__main__":
     args = parse_args()
     warehouse = args.warehouse or f"gs://{args.project_id}-iceberg-warehouse/warehouse"
-    ingest(args.project_id, warehouse, args.year, args.month)
+    ingest(warehouse, args.source_uri)
