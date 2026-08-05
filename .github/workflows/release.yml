@@ -19,6 +19,8 @@ on:
 env:
   GCP_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}
   GCP_REGION: us-central1
+  # Pinned so runtime defaults cannot change Spark/Iceberg versions between runs.
+  DATAPROC_RUNTIME_VERSION: "2.2"
   ICEBERG_WAREHOUSE: gs://${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}-iceberg-warehouse/warehouse
 
 jobs:
@@ -99,6 +101,7 @@ jobs:
           gcloud dataproc batches submit pyspark \
             gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/ingest_bronze.py \
             --region=${{ env.GCP_REGION }} \
+            --version=${{ env.DATAPROC_RUNTIME_VERSION }} \
             --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
             --jars=gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar \
             --properties="spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
@@ -140,6 +143,7 @@ jobs:
           gcloud dataproc batches submit pyspark \
             gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/bronze_to_silver.py \
             --region=${{ env.GCP_REGION }} \
+            --version=${{ env.DATAPROC_RUNTIME_VERSION }} \
             --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
             --jars=gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar \
             --properties="spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
