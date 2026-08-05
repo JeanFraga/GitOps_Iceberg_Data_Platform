@@ -29,14 +29,23 @@ resource "google_project_service" "dataproc" {
   disable_on_destroy = false
 }
 
+# Required by the BigLake connection created in the bq_iceberg module.
+resource "google_project_service" "bigqueryconnection" {
+  project = var.project_id
+  service = "bigqueryconnection.googleapis.com"
+
+  disable_on_destroy = false
+}
+
 module "data_platform" {
   source = "../../modules/bq_iceberg"
 
   project_id               = var.project_id
   region                   = var.region
-  bq_dataset_id            = "gold_star_schema"
   force_destroy            = var.force_destroy
   pipeline_service_account = var.pipeline_service_account
+
+  depends_on = [google_project_service.bigqueryconnection]
 }
 
 # -----------------------------------------------------------------

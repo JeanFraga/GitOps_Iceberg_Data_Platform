@@ -5,6 +5,15 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - '.github/workflows/release.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/release.yml'
+  # NOTE: submit backfill dispatches one at a time — the concurrency group
+  # keeps a single pending slot, so a newly queued dispatch evicts a queued
+  # (not yet started) one, and unlike pushes each dispatch carries unique work.
   workflow_dispatch:
     inputs:
       ingest_year:
@@ -16,27 +25,33 @@ on:
         required: false
         default: '1'
 
+# Queue deploy runs on main so Dataproc/BQ steps never overlap; cancel
+# superseded runs on PRs.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
-  GCP_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+  # Same fallback chain as terraform.yml — keep the two in sync.
+  GCP_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || (secrets.GCP_PROJECT_ID != '' && secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID) }}
   GCP_REGION: us-east1
   # Pinned so runtime defaults cannot change Spark/Iceberg versions between runs.
   DATAPROC_RUNTIME_VERSION: "2.2"
   # Must match the Spark 3.5 / Scala 2.13 shipped by the pinned Dataproc runtime.
   ICEBERG_SPARK_PACKAGE: "org.apache.iceberg:iceberg-spark-runtime-3.5_2.13:1.5.2"
-  ICEBERG_WAREHOUSE: gs://${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}-iceberg-warehouse/warehouse
+  # Must match infra/modules/bq_iceberg (bq_connection_id / silver_dataset_id).
+  BQ_CONNECTION_ID: iceberg-gcs-conn
+  SILVER_DATASET: silver
 
 jobs:
   # -----------------------------------------------------------------------
-  # Job 1 – dbt compile check (runs without a live BQ connection)
+  # Job 1 – validation gate (runs on PRs and pushes; no GCP access needed)
   # -----------------------------------------------------------------------
-  dbt-compile:
-    name: dbt Compile
+  validate:
+    name: Validate (lint, dbt parse, PySpark tests)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    defaults:
-      run:
-        working-directory: src/dbt_project
 
     steps:
       - uses: actions/checkout@v4
@@ -45,21 +60,30 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: src/dbt_project/requirements.txt
+          cache-dependency-path: |
+            src/dbt_project/requirements.txt
+            src/spark_jobs/requirements.txt
 
-      - name: Install dbt
-        run: pip install -r requirements.txt
+      # PySpark needs a JVM; pin it rather than relying on the runner default.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Install Spark job test dependencies
-        run: pip install -r ../spark_jobs/requirements.txt
+      - name: Install dependencies
+        run: pip install -r src/dbt_project/requirements.txt -r src/spark_jobs/requirements.txt
 
-      - name: dbt compile (parse check)
+      - name: Lint (ruff)
+        run: ruff check src/spark_jobs
+
+      - name: dbt parse check
+        working-directory: src/dbt_project
         env:
           GCP_PROJECT_ID: dummy-project   # only needs to exist for Jinja rendering
         run: dbt parse --profiles-dir .
 
-      - name: PySpark unit tests
-        run: pytest ../spark_jobs/tests/ -v
+      - name: PySpark tests (unit + Iceberg integration)
+        run: pytest src/spark_jobs/tests/ -v
 
   # -----------------------------------------------------------------------
   # Job 2 – Submit Bronze ingestion Dataproc Serverless batch
@@ -69,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: dbt-compile
+    needs: validate
     if: github.ref == 'refs/heads/main'
 
     steps:
@@ -83,20 +107,27 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Verify configuration
+      # Secret-derived values must not cross job boundaries (GitHub redacts
+      # job outputs containing secrets), so each deploy job derives them here.
+      # Bucket name must match infra/modules/bq_iceberg's iceberg_warehouse bucket.
+      - name: Verify and derive configuration
         run: |
           if [ -z "$GCP_PROJECT_ID" ]; then
-            echo "GCP_PROJECT_ID is empty. Set the TF_VAR_PROJECT_ID (or GCP_PROJECT_ID) repository secret; bucket paths resolve to gs://-iceberg-warehouse without it." >&2
+            echo "GCP_PROJECT_ID is empty. Set the TF_VAR_PROJECT_ID (or GCP_PROJECT_ID) repository secret." >&2
             exit 1
           fi
+          echo "ICEBERG_BUCKET=gs://${GCP_PROJECT_ID}-iceberg-warehouse" >> "$GITHUB_ENV"
+          echo "ICEBERG_WAREHOUSE=gs://${GCP_PROJECT_ID}-iceberg-warehouse/warehouse" >> "$GITHUB_ENV"
 
       - name: Resolve ingestion parameters
         run: |
           YEAR="${{ github.event.inputs.ingest_year || '2023' }}"
           MONTH="${{ github.event.inputs.ingest_month || '1' }}"
-          SRC_FILE="yellow_tripdata_${YEAR}-$(printf '%02d' "${MONTH}").parquet"
+          PERIOD="${YEAR}-$(printf '%02d' "${MONTH}")"
+          SRC_FILE="yellow_tripdata_${PERIOD}.parquet"
+          echo "PERIOD=${PERIOD}" >> "$GITHUB_ENV"
           echo "SRC_FILE=${SRC_FILE}" >> "$GITHUB_ENV"
-          echo "SOURCE_URI=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/landing/${SRC_FILE}" >> "$GITHUB_ENV"
+          echo "SOURCE_URI=${ICEBERG_BUCKET}/landing/${SRC_FILE}" >> "$GITHUB_ENV"
 
       - name: Stage TLC parquet to GCS
         run: |
@@ -105,21 +136,23 @@ jobs:
 
       - name: Upload PySpark job to GCS
         run: |
-          gsutil cp src/spark_jobs/ingest_bronze.py \
-            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/ingest_bronze.py
+          gsutil cp src/spark_jobs/ingest_bronze.py src/spark_jobs/common.py \
+            "${ICEBERG_BUCKET}/jobs/"
 
       - name: Submit Bronze ingestion batch
         run: |
           gcloud dataproc batches submit pyspark \
-            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/ingest_bronze.py \
+            "${ICEBERG_BUCKET}/jobs/ingest_bronze.py" \
             --region=${{ env.GCP_REGION }} \
             --version=${{ env.DATAPROC_RUNTIME_VERSION }} \
-            --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
+            --deps-bucket="${ICEBERG_BUCKET}/dataproc-deps" \
+            --py-files="${ICEBERG_BUCKET}/jobs/common.py" \
             --properties="spark.jars.packages=${{ env.ICEBERG_SPARK_PACKAGE }},spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
             -- \
             --project-id=${{ env.GCP_PROJECT_ID }} \
-            --warehouse=${{ env.ICEBERG_WAREHOUSE }} \
-            --source-uri=${SOURCE_URI}
+            --warehouse="${ICEBERG_WAREHOUSE}" \
+            --source-uri="${SOURCE_URI}" \
+            --period="${PERIOD}"
 
   # -----------------------------------------------------------------------
   # Job 3 – Submit Silver ETL Dataproc Serverless batch
@@ -143,39 +176,53 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      # See the note on the equivalent step in ingest-bronze.
+      - name: Verify and derive configuration
+        run: |
+          if [ -z "$GCP_PROJECT_ID" ]; then
+            echo "GCP_PROJECT_ID is empty. Set the TF_VAR_PROJECT_ID (or GCP_PROJECT_ID) repository secret." >&2
+            exit 1
+          fi
+          echo "ICEBERG_BUCKET=gs://${GCP_PROJECT_ID}-iceberg-warehouse" >> "$GITHUB_ENV"
+          echo "ICEBERG_WAREHOUSE=gs://${GCP_PROJECT_ID}-iceberg-warehouse/warehouse" >> "$GITHUB_ENV"
+
       - name: Upload PySpark job to GCS
         run: |
-          gsutil cp src/spark_jobs/bronze_to_silver.py \
-            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/bronze_to_silver.py
+          gsutil cp src/spark_jobs/bronze_to_silver.py src/spark_jobs/common.py \
+            "${ICEBERG_BUCKET}/jobs/"
 
       - name: Submit Silver ETL batch
         run: |
           gcloud dataproc batches submit pyspark \
-            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/bronze_to_silver.py \
+            "${ICEBERG_BUCKET}/jobs/bronze_to_silver.py" \
             --region=${{ env.GCP_REGION }} \
             --version=${{ env.DATAPROC_RUNTIME_VERSION }} \
-            --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
+            --deps-bucket="${ICEBERG_BUCKET}/dataproc-deps" \
+            --py-files="${ICEBERG_BUCKET}/jobs/common.py" \
             --properties="spark.jars.packages=${{ env.ICEBERG_SPARK_PACKAGE }},spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
             -- \
             --project-id=${{ env.GCP_PROJECT_ID }} \
-            --warehouse=${{ env.ICEBERG_WAREHOUSE }}
+            --warehouse="${ICEBERG_WAREHOUSE}"
 
       - name: Register Silver table in BigQuery
         run: |
-          SILVER_METADATA_DIR=${{ env.ICEBERG_WAREHOUSE }}/silver/yellow_trips/metadata
+          SILVER_METADATA_DIR="${ICEBERG_WAREHOUSE}/silver/yellow_trips/metadata"
           # Iceberg's Hadoop catalog records the current metadata version here.
           VERSION=$(gsutil cat "${SILVER_METADATA_DIR}/version-hint.text")
           METADATA_URI="${SILVER_METADATA_DIR}/v${VERSION}.metadata.json"
           echo "Registering Iceberg metadata: ${METADATA_URI}"
 
+          # Terraform owns the silver dataset (infra/modules/bq_iceberg); the
+          # idempotent CREATE SCHEMA keeps this job order-independent from the
+          # terraform workflow when both fire on the same push.
           bq --location=${{ env.GCP_REGION }} query --use_legacy_sql=false \
-            "CREATE SCHEMA IF NOT EXISTS \`${{ env.GCP_PROJECT_ID }}.silver\`;
-             CREATE OR REPLACE EXTERNAL TABLE \`${{ env.GCP_PROJECT_ID }}.silver.yellow_trips\`
-             WITH CONNECTION \`${{ env.GCP_PROJECT_ID }}.${{ env.GCP_REGION }}.iceberg-gcs-conn\`
+            "CREATE SCHEMA IF NOT EXISTS \`${{ env.GCP_PROJECT_ID }}.${{ env.SILVER_DATASET }}\`;
+             CREATE OR REPLACE EXTERNAL TABLE \`${{ env.GCP_PROJECT_ID }}.${{ env.SILVER_DATASET }}.yellow_trips\`
+             WITH CONNECTION \`${{ env.GCP_PROJECT_ID }}.${{ env.GCP_REGION }}.${{ env.BQ_CONNECTION_ID }}\`
              OPTIONS (format = 'ICEBERG', uris = ['${METADATA_URI}'])"
 
   # -----------------------------------------------------------------------
-  # Job 4 – dbt run (Gold layer)
+  # Job 4 – dbt build (Gold layer)
   # -----------------------------------------------------------------------
   dbt-run:
     name: dbt Run (Gold Layer)
@@ -204,6 +251,9 @@ jobs:
 
       - name: Install dbt
         run: pip install -r requirements.txt
+
+      - name: dbt seed
+        run: dbt seed --profiles-dir .
 
       - name: dbt run
         run: dbt run --profiles-dir .

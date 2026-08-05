@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: "/src/spark_jobs"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: "/src/dbt_project"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: terraform
+    directories:
+      - "/infra/environments/dev"
+      - "/infra/modules/bq_iceberg"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: "/.devcontainer"
+    schedule:
+      interval: weekly

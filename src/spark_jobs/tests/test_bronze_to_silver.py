@@ -3,24 +3,18 @@ Unit tests for bronze_to_silver.py transformation logic.
 Runs with pytest + PySpark in local mode (no GCS required).
 """
 
+from datetime import datetime
+
 import pytest
-from pyspark.sql import SparkSession
 from pyspark.sql.types import (
     DoubleType,
     LongType,
-    StringType,
     StructField,
     StructType,
     TimestampType,
 )
-from datetime import datetime
-from pathlib import Path
-import sys
 
-# Ensure src/spark_jobs is importable regardless of pytest working directory
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from bronze_to_silver import parse_args, transform_bronze_to_silver
+from bronze_to_silver import MERGE_KEYS, parse_args, transform_bronze_to_silver
 
 SCHEMA = StructType(
     [
@@ -35,18 +29,6 @@ SCHEMA = StructType(
         StructField("total_amount", DoubleType(), True),
     ]
 )
-
-
-@pytest.fixture(scope="session")
-def spark():
-    session = (
-        SparkSession.builder.master("local[1]")
-        .appName("test_bronze_to_silver")
-        .getOrCreate()
-    )
-    session.sparkContext.setLogLevel("ERROR")
-    yield session
-    session.stop()
 
 
 def make_df(spark, rows):
@@ -109,6 +91,41 @@ class TestDeduplication:
         df = make_df(spark, rows)
         result = transform_bronze_to_silver(df)
         assert result.count() == 2
+
+    def test_output_unique_on_merge_keys(self, spark):
+        """Rows differing only outside MERGE_KEYS must collapse to one row,
+        otherwise the downstream MERGE INTO hits a cardinality violation."""
+        rows = [
+            (1, datetime(2023, 1, 1, 10, 0), datetime(2023, 1, 1, 10, 30), 1.0, 5.0, 100, 200, 1, 15.0),
+            (1, datetime(2023, 1, 1, 10, 0), datetime(2023, 1, 1, 10, 30), 3.0, 5.0, 100, 200, 1, 15.0),
+        ]
+        df = make_df(spark, rows)
+        result = transform_bronze_to_silver(df)
+        assert result.count() == 1
+        assert result.select(*MERGE_KEYS).distinct().count() == result.count()
+
+    def test_retains_distinct_same_second_trips(self, spark):
+        """Distinct trips sharing a vendor and pickup second are routine in
+        real TLC data; the key must not collapse them (data-loss regression)."""
+        pickup = datetime(2023, 1, 1, 10, 0)
+        rows = [
+            (1, pickup, datetime(2023, 1, 1, 10, 30), 1.0, 5.0, 100, 200, 1, 15.0),
+            (1, pickup, datetime(2023, 1, 1, 10, 45), 1.0, 7.0, 101, 250, 1, 22.0),
+        ]
+        df = make_df(spark, rows)
+        result = transform_bronze_to_silver(df)
+        assert result.count() == 2
+
+    def test_drops_rows_missing_a_merge_key_component(self, spark):
+        """A NULL key component never matches in MERGE ON and would duplicate
+        on every re-run, so such rows are filtered out."""
+        rows = [
+            (1, datetime(2023, 1, 1, 10, 0), datetime(2023, 1, 1, 10, 30), 1.0, 5.0, None, 200, 1, 15.0),
+            (1, datetime(2023, 1, 1, 11, 0), datetime(2023, 1, 1, 11, 30), 1.0, 5.0, 100, 200, 1, 20.0),
+        ]
+        df = make_df(spark, rows)
+        result = transform_bronze_to_silver(df)
+        assert result.count() == 1
 
 
 class TestArgumentValidation:

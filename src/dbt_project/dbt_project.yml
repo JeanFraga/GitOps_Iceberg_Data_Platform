@@ -18,5 +18,13 @@ clean-targets:
 
 models:
   nyc_taxi_gold:
+    staging:
+      +materialized: view
     gold:
       +materialized: table
+
+seeds:
+  nyc_taxi_gold:
+    taxi_zone_lookup:
+      +column_types:
+        location_id: INT64

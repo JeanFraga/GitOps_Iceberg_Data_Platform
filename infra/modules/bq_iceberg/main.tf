@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.5"
+
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -41,10 +43,20 @@ resource "google_bigquery_dataset" "iceberg_dataset" {
 }
 
 # -----------------------------------------------------------------
+# BigQuery Dataset – Silver layer (holds the BigLake external table
+# registered by the release workflow)
+# -----------------------------------------------------------------
+resource "google_bigquery_dataset" "silver_dataset" {
+  dataset_id                 = var.silver_dataset_id
+  location                   = var.region
+  delete_contents_on_destroy = var.force_destroy
+}
+
+# -----------------------------------------------------------------
 # BigQuery Connection – BigLake / GCS federation
 # -----------------------------------------------------------------
 resource "google_bigquery_connection" "gcs_connection" {
-  connection_id = "iceberg-gcs-conn"
+  connection_id = var.bq_connection_id
   location      = var.region
   cloud_resource {}
 }

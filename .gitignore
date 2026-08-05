@@ -1,5 +1,5 @@
 # Terraform
-.terraform/
+.terraform*/
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.*
@@ -29,6 +29,7 @@ env/
 src/dbt_project/target/
 src/dbt_project/dbt_packages/
 src/dbt_project/logs/
+src/dbt_project/.user.yml
 
 # Java / Spark
 *.jar
@@ -44,9 +45,11 @@ src/dbt_project/logs/
 .DS_Store
 Thumbs.db
 
-# GCP credentials – never commit these
+# GCP credentials – never commit these. JSON is blanket-ignored because
+# service-account keys default to un-guessable names (<project>-<hex>.json);
+# negate intentionally tracked JSON files explicitly below.
 *.json
-!src/dbt_project/profiles.yml
+!.devcontainer/devcontainer.json
 secrets/
 
 # Local environment – never commit these
