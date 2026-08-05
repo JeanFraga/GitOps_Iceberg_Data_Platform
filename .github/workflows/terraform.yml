@@ -58,7 +58,7 @@ jobs:
           echo "TF_VAR_pipeline_service_account=$INPUT_PIPELINE_SA" >> "$GITHUB_ENV"
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.8.x"
 
