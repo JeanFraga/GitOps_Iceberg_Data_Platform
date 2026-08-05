@@ -17,9 +17,9 @@ on:
         default: '1'
 
 env:
-  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}
   GCP_REGION: us-central1
-  ICEBERG_WAREHOUSE: gs://${{ secrets.GCP_PROJECT_ID }}-iceberg-warehouse/warehouse
+  ICEBERG_WAREHOUSE: gs://${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || secrets.GCP_PROJECT_ID }}-iceberg-warehouse/warehouse
 
 jobs:
   # -----------------------------------------------------------------------
@@ -78,6 +78,13 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify configuration
+        run: |
+          if [ -z "$GCP_PROJECT_ID" ]; then
+            echo "GCP_PROJECT_ID is empty. Set the TF_VAR_PROJECT_ID (or GCP_PROJECT_ID) repository secret; bucket paths resolve to gs://-iceberg-warehouse without it." >&2
+            exit 1
+          fi
 
       - name: Upload PySpark job to GCS
         run: |

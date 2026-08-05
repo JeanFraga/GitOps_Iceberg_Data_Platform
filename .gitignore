@@ -2,7 +2,7 @@
 .terraform/
 .terraform.lock.hcl
 *.tfstate
-*.tfstate.backup
+*.tfstate.*
 *.tfplan
 tfplan
 *.tfvars.local
@@ -47,3 +47,9 @@ Thumbs.db
 # GCP credentials – never commit these
 *.json
 !src/dbt_project/profiles.yml
+secrets/
+
+# Local environment – never commit these
+.env
+.env.*
+!.env.example

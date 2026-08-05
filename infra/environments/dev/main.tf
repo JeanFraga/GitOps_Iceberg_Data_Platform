@@ -8,11 +8,11 @@ terraform {
     }
   }
 
-  # Uncomment and configure a remote backend for real deployments
-  # backend "gcs" {
-  #   bucket = "<YOUR_TERRAFORM_STATE_BUCKET>"
-  #   prefix = "terraform/dev"
-  # }
+  # Bucket is created out-of-band; Terraform cannot manage its own state store.
+  backend "gcs" {
+    bucket = "gitops-iceberg-data-platform-tfstate"
+    prefix = "terraform/dev"
+  }
 }
 
 provider "google" {

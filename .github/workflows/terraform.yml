@@ -10,9 +10,9 @@ on:
     paths:
       - 'infra/**'
 
+# TF_VAR_* are set in the "Resolve Terraform variables" step, not here:
+# a workflow-level env entry overrides $GITHUB_ENV in every later step.
 env:
-  TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID != '' && secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID }}
-  TF_VAR_pipeline_service_account: ${{ secrets.PIPELINE_SERVICE_ACCOUNT }}
   GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GCP_SA_KEY }}
 
 defaults:
@@ -37,18 +37,17 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Resolve Terraform variables
-        id: resolve-vars
         env:
-          INPUT_PROJECT_ID: ${{ env.TF_VAR_project_id }}
+          INPUT_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || (secrets.GCP_PROJECT_ID != '' && secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID) }}
+          INPUT_PIPELINE_SA: ${{ secrets.PIPELINE_SERVICE_ACCOUNT }}
         run: |
           project_id="${INPUT_PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
           if [ -z "$project_id" ]; then
-            echo "project_id_available=false" >> "$GITHUB_OUTPUT"
-            echo "TF_VAR_project_id is not set. Configure secrets.GCP_PROJECT_ID, vars.GCP_PROJECT_ID, or ensure GCP auth exposes GOOGLE_CLOUD_PROJECT." > plan.txt
-            exit 0
+            echo "TF_VAR_project_id is not set. Configure secrets.TF_VAR_PROJECT_ID, secrets.GCP_PROJECT_ID, vars.GCP_PROJECT_ID, or ensure GCP auth exposes GOOGLE_CLOUD_PROJECT." >&2
+            exit 1
           fi
           echo "TF_VAR_project_id=$project_id" >> "$GITHUB_ENV"
-          echo "project_id_available=true" >> "$GITHUB_OUTPUT"
+          echo "TF_VAR_pipeline_service_account=$INPUT_PIPELINE_SA" >> "$GITHUB_ENV"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -56,29 +55,26 @@ jobs:
           terraform_version: "1.8.x"
 
       - name: Terraform Init
-        if: steps.resolve-vars.outputs.project_id_available == 'true'
         run: terraform init
 
       - name: Terraform Validate
-        if: steps.resolve-vars.outputs.project_id_available == 'true'
         run: terraform validate
 
       - name: Terraform Format Check
-        if: steps.resolve-vars.outputs.project_id_available == 'true'
         run: terraform fmt -check -recursive ../../..
 
       - name: Terraform Plan
         id: plan
-        if: steps.resolve-vars.outputs.project_id_available == 'true'
         run: |
+          # Without pipefail the exit code comes from tee, hiding plan failures.
+          set -o pipefail
           terraform plan \
             -var-file=dev.tfvars \
             -out=tfplan \
             -no-color 2>&1 | tee plan.txt
-        continue-on-error: true
 
       - name: Post Plan to PR
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && hashFiles('infra/environments/dev/plan.txt') != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -94,5 +90,5 @@ jobs:
             });
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.resolve-vars.outputs.project_id_available == 'true' && steps.plan.outcome == 'success'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.plan.outcome == 'success'
         run: terraform apply -auto-approve tfplan
