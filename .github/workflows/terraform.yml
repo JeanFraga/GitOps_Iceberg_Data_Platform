@@ -11,7 +11,7 @@ on:
       - 'infra/**'
 
 env:
-  TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+  TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID != '' && secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID }}
   TF_VAR_pipeline_service_account: ${{ secrets.PIPELINE_SERVICE_ACCOUNT }}
   GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GCP_SA_KEY }}
 
@@ -35,6 +35,18 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Resolve Terraform variables
+        env:
+          INPUT_PROJECT_ID: ${{ env.TF_VAR_project_id }}
+          AUTH_PROJECT_ID: ${{ env.GOOGLE_CLOUD_PROJECT }}
+        run: |
+          project_id="${INPUT_PROJECT_ID:-$AUTH_PROJECT_ID}"
+          if [ -z "$project_id" ]; then
+            echo "TF_VAR_project_id is not set. Configure secrets.GCP_PROJECT_ID, vars.GCP_PROJECT_ID, or ensure GCP auth exposes GOOGLE_CLOUD_PROJECT." >&2
+            exit 1
+          fi
+          echo "TF_VAR_project_id=$project_id" >> "$GITHUB_ENV"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -76,5 +88,5 @@ jobs:
             });
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.plan.outcome == 'success'
         run: terraform apply -auto-approve tfplan
