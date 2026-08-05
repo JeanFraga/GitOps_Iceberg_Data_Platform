@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: silver
+    description: "Cleansed Silver layer – Apache Iceberg tables on GCS accessed via BigLake"
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: silver
+    tables:
+      - name: yellow_trips
+        description: "De-duplicated and cleansed NYC Yellow Taxi trip records"
+        columns:
+          - name: vendor_id
+            description: "Provider that provided the record (1=Creative Mobile, 2=VeriFone)"
+          - name: tpep_pickup_datetime
+            description: "Date and time when the meter was engaged"
+          - name: tpep_dropoff_datetime
+            description: "Date and time when the meter was disengaged"
+          - name: passenger_count
+            description: "Number of passengers in the vehicle"
+          - name: trip_distance
+            description: "Elapsed trip distance in miles"
+          - name: pu_location_id
+            description: "TLC Taxi Zone where the meter was engaged"
+          - name: do_location_id
+            description: "TLC Taxi Zone where the meter was disengaged"
+          - name: total_amount
+            description: "Total amount charged to passengers"

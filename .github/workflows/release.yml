@@ -1,0 +1,172 @@
+name: Release – Spark & dbt
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      ingest_year:
+        description: 'Year of NYC TLC data to ingest (e.g. 2023)'
+        required: false
+        default: '2023'
+      ingest_month:
+        description: 'Month of NYC TLC data to ingest (e.g. 1)'
+        required: false
+        default: '1'
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: us-central1
+  ICEBERG_WAREHOUSE: gs://${{ secrets.GCP_PROJECT_ID }}-iceberg-warehouse/warehouse
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1 – dbt compile check (runs without a live BQ connection)
+  # -----------------------------------------------------------------------
+  dbt-compile:
+    name: dbt Compile
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/dbt_project
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: src/dbt_project/requirements.txt
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+
+      - name: dbt compile (parse check)
+        env:
+          GCP_PROJECT_ID: dummy-project   # only needs to exist for Jinja rendering
+        run: dbt parse --profiles-dir .
+
+  # -----------------------------------------------------------------------
+  # Job 2 – Submit Bronze ingestion Dataproc Serverless batch
+  # -----------------------------------------------------------------------
+  ingest-bronze:
+    name: Ingest Bronze (Dataproc Serverless)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: dbt-compile
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload PySpark job to GCS
+        run: |
+          gsutil cp src/spark_jobs/ingest_bronze.py \
+            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/ingest_bronze.py
+
+      - name: Submit Bronze ingestion batch
+        run: |
+          YEAR=${{ github.event.inputs.ingest_year || '2023' }}
+          MONTH=${{ github.event.inputs.ingest_month || '1' }}
+
+          gcloud dataproc batches submit pyspark \
+            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/ingest_bronze.py \
+            --region=${{ env.GCP_REGION }} \
+            --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
+            --jars=gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar \
+            --properties="spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
+            -- \
+            --project-id=${{ env.GCP_PROJECT_ID }} \
+            --warehouse=${{ env.ICEBERG_WAREHOUSE }} \
+            --year=${YEAR} \
+            --month=${MONTH}
+
+  # -----------------------------------------------------------------------
+  # Job 3 – Submit Silver ETL Dataproc Serverless batch
+  # -----------------------------------------------------------------------
+  silver-etl:
+    name: Silver ETL (Dataproc Serverless)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: ingest-bronze
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload PySpark job to GCS
+        run: |
+          gsutil cp src/spark_jobs/bronze_to_silver.py \
+            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/bronze_to_silver.py
+
+      - name: Submit Silver ETL batch
+        run: |
+          gcloud dataproc batches submit pyspark \
+            gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/jobs/bronze_to_silver.py \
+            --region=${{ env.GCP_REGION }} \
+            --deps-bucket=gs://${{ env.GCP_PROJECT_ID }}-iceberg-warehouse/dataproc-deps \
+            --jars=gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar \
+            --properties="spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
+            -- \
+            --project-id=${{ env.GCP_PROJECT_ID }} \
+            --warehouse=${{ env.ICEBERG_WAREHOUSE }}
+
+  # -----------------------------------------------------------------------
+  # Job 4 – dbt run (Gold layer)
+  # -----------------------------------------------------------------------
+  dbt-run:
+    name: dbt Run (Gold Layer)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: silver-etl
+    if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: src/dbt_project
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: src/dbt_project/requirements.txt
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+
+      - name: dbt run
+        run: dbt run --profiles-dir .
+
+      - name: dbt test
+        run: dbt test --profiles-dir .

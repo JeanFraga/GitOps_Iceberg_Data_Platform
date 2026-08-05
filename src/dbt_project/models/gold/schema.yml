@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: fact_trips
+    description: "Fact table containing one row per taxi trip with surrogate key"
+    columns:
+      - name: trip_id
+        description: "Surrogate key (FARM_FINGERPRINT of vendor_id + pickup datetime)"
+        tests:
+          - not_null
+          - unique
+      - name: vendor_id
+        tests:
+          - not_null
+      - name: total_amount
+        tests:
+          - not_null
+
+  - name: dim_locations
+    description: "Dimension table of unique TLC Taxi Zone location IDs"
+    columns:
+      - name: location_id
+        tests:
+          - not_null
+          - unique
+
+  - name: dim_date
+    description: "Date dimension derived from Silver trip pickup datetimes"
+    columns:
+      - name: date_day
+        tests:
+          - not_null
+          - unique
