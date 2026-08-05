@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import logging
+import re
 import sys
 
 from pyspark.sql import SparkSession
@@ -19,6 +20,14 @@ from pyspark.sql.functions import days
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
+
+
+def to_snake_case(name: str) -> str:
+    """Normalise a TLC column name (e.g. PULocationID) to snake_case (pu_location_id)."""
+    name = name.strip().replace(" ", "_")
+    name = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+    return re.sub(r"__+", "_", name).lower()
 
 
 def build_spark_session(warehouse_uri: str) -> SparkSession:
@@ -43,7 +52,7 @@ def ingest(warehouse_uri: str, source_uri: str) -> None:
     raw_df = spark.read.parquet(source_uri)
 
     # Normalise column names to snake_case
-    renamed = raw_df.toDF(*[c.lower().replace(" ", "_") for c in raw_df.columns])
+    renamed = raw_df.toDF(*[to_snake_case(c) for c in raw_df.columns])
 
     # Ensure Bronze namespace exists
     spark.sql("CREATE NAMESPACE IF NOT EXISTS gcs_catalog.bronze")
