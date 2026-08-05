@@ -1,6 +1,6 @@
 # dev.tfvars  – do NOT commit real credentials
-# Copy to dev.tfvars.local and override sensitive values there
-project_id               = "your-gcp-project-id"
-region                   = "us-central1"
-force_destroy            = true
-pipeline_service_account = ""
+# Sensitive values (project_id, pipeline_service_account) are supplied via
+# TF_VAR_project_id and TF_VAR_pipeline_service_account environment variables
+# set from GitHub Actions secrets (GCP_PROJECT_ID, PIPELINE_SERVICE_ACCOUNT).
+region        = "us-central1"
+force_destroy = true
