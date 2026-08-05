@@ -35,9 +35,9 @@ resource "google_storage_bucket" "iceberg_warehouse" {
 # BigQuery Dataset – Gold star-schema layer
 # -----------------------------------------------------------------
 resource "google_bigquery_dataset" "iceberg_dataset" {
-  dataset_id                  = var.bq_dataset_id
-  location                    = var.region
-  delete_contents_on_destroy  = var.force_destroy
+  dataset_id                 = var.bq_dataset_id
+  location                   = var.region
+  delete_contents_on_destroy = var.force_destroy
 }
 
 # -----------------------------------------------------------------
