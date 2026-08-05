@@ -118,13 +118,12 @@ def ingest(warehouse_uri: str, source_uri: str, period: str = None) -> None:
     normalized = normalize_to_trip_schema(renamed)
 
     if period:
-        total = normalized.count()
-        normalized = filter_to_period(normalized, period)
-        kept = normalized.count()
-        if kept < total:
-            logger.warning(
-                "Dropped %d rows with pickups outside period %s", total - kept, period
-            )
+        start, end = period_bounds(period)
+        in_period = (col("tpep_pickup_datetime") >= lit(start)) & (col("tpep_pickup_datetime") < lit(end))
+        dropped = normalized.filter(~in_period).count()
+        normalized = normalized.filter(in_period)
+        if dropped:
+            logger.warning("Dropped %d rows with pickups outside period %s", dropped, period)
     else:
         logger.warning(
             "No --period given; stray out-of-month rows in the source can "
