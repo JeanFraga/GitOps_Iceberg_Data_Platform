@@ -88,10 +88,12 @@ data-platform-gitops/
 
 All dependencies (Terraform, PySpark, dbt, gcloud) are pre-installed.
 
-### 2. Authenticate to GCP
+### 2. Authenticate to GCP with `GCP_SA_KEY`
 
 ```bash
-gcloud auth application-default login
+echo "$GCP_SA_KEY" | base64 --decode > /tmp/gcp-sa-key.json
+gcloud auth activate-service-account --key-file=/tmp/gcp-sa-key.json
+gcloud auth application-default login --cred-file=/tmp/gcp-sa-key.json
 export GCP_PROJECT_ID=your-gcp-project-id
 ```
 
@@ -140,7 +142,7 @@ Add the following secrets to your GitHub repository:
 | Secret | Description |
 |---|---|
 | `GCP_PROJECT_ID` | GCP project ID |
-| `GCP_SA_KEY` | Base64-encoded service account JSON key |
+| `GCP_SA_KEY` | Base64-encoded service account JSON key used for GitHub Actions and local authentication |
 | `PIPELINE_SERVICE_ACCOUNT` | Service account email for Dataproc jobs |
 
 ---
