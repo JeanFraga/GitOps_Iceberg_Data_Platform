@@ -134,7 +134,11 @@ def nyc_taxi_incremental():
 
     @task
     def stage_to_landing(resolved: dict) -> str:
-        """Stream the public TLC parquet into the landing prefix on GCS."""
+        """Copy the public TLC parquet to the landing prefix on GCS.
+
+        Downloaded in chunks to a worker temp file (~50-120 MB, well within
+        the SMALL preset's storage), then uploaded — never held in memory.
+        """
         with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp:
             with requests.get(resolved["url"], stream=True, timeout=600) as resp:
                 resp.raise_for_status()
