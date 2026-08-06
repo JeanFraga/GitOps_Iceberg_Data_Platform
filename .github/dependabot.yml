@@ -40,8 +40,12 @@ updates:
         patterns: ["*"]
     ignore:
       # Provider major upgrades are deliberate migrations, not auto-bumps.
+      # Both forms: update-types misses requirement-style bumps (observed
+      # with the ~> 5.0 → ~> 6.50 proposal), so pin the ceiling explicitly.
       - dependency-name: "hashicorp/google"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "hashicorp/google"
+        versions: [">= 6"]
 
   - package-ecosystem: docker
     directory: "/.devcontainer"
