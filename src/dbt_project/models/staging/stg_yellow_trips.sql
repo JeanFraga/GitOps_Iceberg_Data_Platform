@@ -2,8 +2,13 @@
   Staging layer over the Silver BigLake external table: renames columns to
   analytics-friendly names in one place so gold models never touch the source
   directly.
+
+  DISTINCT guards against physical duplicate rows in the Iceberg table:
+  Spark's MERGE upserts but never deletes, so byte-identical copies (e.g.
+  from pre-refactor runs, or a retried write) would otherwise reach gold and
+  break fact_trips' surrogate-key uniqueness.
 */
-SELECT
+SELECT DISTINCT
     vendor_id,
     tpep_pickup_datetime,
     tpep_dropoff_datetime,
