@@ -105,7 +105,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       # Secret-derived values must not cross job boundaries (GitHub redacts
       # job outputs containing secrets), so each deploy job derives them here.
@@ -174,7 +174,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       # See the note on the equivalent step in ingest-bronze.
       - name: Verify and derive configuration
