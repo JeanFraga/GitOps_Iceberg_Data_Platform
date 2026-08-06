@@ -7,7 +7,7 @@ sources:
     schema: silver
     tables:
       - name: yellow_trips
-        description: "De-duplicated and cleansed NYC Yellow Taxi trip records; unique on (vendor_id, tpep_pickup_datetime)"
+        description: "De-duplicated and cleansed NYC Yellow Taxi trip records; unique on the business key (vendor_id, tpep_pickup_datetime, tpep_dropoff_datetime, pu_location_id, do_location_id) — MERGE_KEYS in bronze_to_silver.py"
         columns:
           - name: vendor_id
             description: "Provider that provided the record (1=Creative Mobile, 2=VeriFone)"

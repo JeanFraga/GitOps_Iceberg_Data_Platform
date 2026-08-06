@@ -85,3 +85,17 @@ resource "google_project_iam_member" "pipeline_sa_bq_job_user" {
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${var.pipeline_service_account}"
 }
+
+# Creating BigLake external tables through the connection requires
+# bigquery.connections.delegate, which only connectionAdmin carries
+# (connectionUser has get/list/use but NOT delegate). Scoped to this single
+# connection. The release workflow authenticates as this same SA (GCP_SA_KEY),
+# so the registration step depends on this grant.
+resource "google_bigquery_connection_iam_member" "pipeline_sa_connection_admin" {
+  count         = var.pipeline_service_account != "" ? 1 : 0
+  project       = var.project_id
+  location      = var.region
+  connection_id = google_bigquery_connection.gcs_connection.connection_id
+  role          = "roles/bigquery.connectionAdmin"
+  member        = "serviceAccount:${var.pipeline_service_account}"
+}

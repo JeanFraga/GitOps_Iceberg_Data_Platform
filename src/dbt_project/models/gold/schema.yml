@@ -5,7 +5,7 @@ models:
     description: "Fact table containing one row per taxi trip with surrogate key"
     columns:
       - name: trip_id
-        description: "Surrogate key (FARM_FINGERPRINT of vendor_id + pickup datetime, the Silver-layer business key)"
+        description: "Surrogate key (FARM_FINGERPRINT of the Silver-layer business key: vendor, pickup, dropoff, pickup zone, dropoff zone)"
         tests:
           - not_null
           - unique
