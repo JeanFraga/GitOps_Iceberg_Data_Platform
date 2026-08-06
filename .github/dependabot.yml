@@ -4,16 +4,30 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: pip
     directory: "/src/spark_jobs"
     schedule:
       interval: weekly
+    groups:
+      spark-deps:
+        patterns: ["*"]
+    ignore:
+      # pyspark must track the Spark version shipped by the pinned Dataproc
+      # runtime (DATAPROC_RUNTIME_VERSION in release.yml).
+      - dependency-name: "pyspark"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: "/src/dbt_project"
     schedule:
       interval: weekly
+    groups:
+      dbt-deps:
+        patterns: ["*"]
 
   - package-ecosystem: terraform
     directories:
@@ -21,6 +35,13 @@ updates:
       - "/infra/modules/bq_iceberg"
     schedule:
       interval: weekly
+    groups:
+      terraform-deps:
+        patterns: ["*"]
+    ignore:
+      # Provider major upgrades are deliberate migrations, not auto-bumps.
+      - dependency-name: "hashicorp/google"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: "/.devcontainer"
