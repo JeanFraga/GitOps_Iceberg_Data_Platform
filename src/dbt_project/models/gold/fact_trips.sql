@@ -1,8 +1,13 @@
 SELECT
+    -- Must hash the full Silver business key (MERGE_KEYS in bronze_to_silver.py):
+    -- vendor + pickup second alone is not unique across distinct trips.
     FARM_FINGERPRINT(
         CONCAT(
-            CAST(t.vendor_id AS STRING),
-            CAST(t.tpep_pickup_datetime AS STRING)
+            CAST(t.vendor_id AS STRING), '|',
+            CAST(t.tpep_pickup_datetime AS STRING), '|',
+            CAST(t.tpep_dropoff_datetime AS STRING), '|',
+            CAST(t.pickup_location_id AS STRING), '|',
+            CAST(t.dropoff_location_id AS STRING)
         )
     )                        AS trip_id,
     t.vendor_id,

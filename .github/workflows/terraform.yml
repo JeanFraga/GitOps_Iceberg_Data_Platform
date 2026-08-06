@@ -30,6 +30,9 @@ defaults:
 jobs:
   terraform:
     name: Terraform Validate → Plan → Apply
+    # Dependabot-triggered runs receive no repository secrets, so GCP auth and
+    # plan cannot work; skip instead of failing red on its PRs.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
