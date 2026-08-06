@@ -24,6 +24,14 @@ on:
         description: 'Month of NYC TLC data to ingest (e.g. 1)'
         required: false
         default: '1'
+      layers:
+        description: 'Layers to run (dbt-only skips the Dataproc bronze/silver batches)'
+        type: choice
+        required: false
+        default: all
+        options:
+          - all
+          - dbt-only
 
 # Queue deploy runs on main so Dataproc/BQ steps never overlap; cancel
 # superseded runs on PRs.
@@ -94,7 +102,9 @@ jobs:
     permissions:
       contents: read
     needs: validate
-    if: github.ref == 'refs/heads/main'
+    # Empty inputs (push events) run everything; dbt-only dispatches skip the
+    # Dataproc layers (silver-etl then skips via the needs cascade).
+    if: github.ref == 'refs/heads/main' && github.event.inputs.layers != 'dbt-only'
 
     steps:
       - uses: actions/checkout@v7
@@ -229,8 +239,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    needs: silver-etl
-    if: github.ref == 'refs/heads/main'
+    needs: [validate, silver-etl]
+    # Runs after a successful silver-etl, or directly after validate when a
+    # dbt-only dispatch skipped the Dataproc layers. Never on real failures.
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/main' &&
+          needs.validate.result == 'success' &&
+          (needs.silver-etl.result == 'success' ||
+           (needs.silver-etl.result == 'skipped' && github.event.inputs.layers == 'dbt-only')) }}
     defaults:
       run:
         working-directory: src/dbt_project

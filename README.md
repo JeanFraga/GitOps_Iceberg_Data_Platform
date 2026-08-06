@@ -190,6 +190,8 @@ Two GitHub Actions workflows:
   backfilled via `workflow_dispatch` (`ingest_year`/`ingest_month`) — submit
   backfills **one at a time**: the concurrency group holds a single pending
   slot, so a newly queued dispatch silently evicts an already-queued one.
+  Dispatching with `layers: dbt-only` rebuilds just the Gold layer without
+  re-running the Dataproc bronze/silver batches.
 
 ### Secrets Required
 
