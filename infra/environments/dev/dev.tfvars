@@ -4,3 +4,7 @@
 # set from GitHub Actions secrets (GCP_PROJECT_ID, PIPELINE_SERVICE_ACCOUNT).
 region        = "us-east1"
 force_destroy = true
+
+# Cost lever: the Composer environment bills continuously; set false and
+# apply to destroy it between PoC testing sessions.
+composer_enabled = true

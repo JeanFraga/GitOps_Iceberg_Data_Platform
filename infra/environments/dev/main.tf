@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 5.0"
+    }
   }
 
   # Bucket is created out-of-band; Terraform cannot manage its own state store.
@@ -16,6 +20,12 @@ terraform {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+# Used by the composer module's google_project_service_identity only.
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
@@ -37,6 +47,15 @@ resource "google_project_service" "bigqueryconnection" {
   disable_on_destroy = false
 }
 
+# Required by the Cloud Composer environment (composer module).
+resource "google_project_service" "composer" {
+  count   = var.composer_enabled ? 1 : 0
+  project = var.project_id
+  service = "composer.googleapis.com"
+
+  disable_on_destroy = false
+}
+
 module "data_platform" {
   source = "../../modules/bq_iceberg"
 
@@ -46,6 +65,20 @@ module "data_platform" {
   pipeline_service_account = var.pipeline_service_account
 
   depends_on = [google_project_service.bigqueryconnection]
+}
+
+# Daily incremental-load orchestration. Gated behind composer_enabled: the
+# environment bills continuously (~$10-12/day even at the smallest size), so
+# flip the flag to false and apply to tear it down between testing sessions.
+module "composer" {
+  count  = var.composer_enabled ? 1 : 0
+  source = "../../modules/composer"
+
+  project_id               = var.project_id
+  region                   = var.region
+  iceberg_warehouse_bucket = module.data_platform.iceberg_warehouse_bucket
+
+  depends_on = [google_project_service.composer]
 }
 
 # -----------------------------------------------------------------
@@ -61,4 +94,12 @@ output "bq_connection_id" {
 
 output "bq_connection_service_account" {
   value = module.data_platform.bq_connection_service_account
+}
+
+output "composer_dag_gcs_prefix" {
+  value = one(module.composer[*].dag_gcs_prefix)
+}
+
+output "composer_airflow_uri" {
+  value = one(module.composer[*].airflow_uri)
 }

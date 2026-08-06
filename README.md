@@ -53,9 +53,11 @@ GitOps_Iceberg_Data_Platform/
 │   ├── dependabot.yml       # Automated dependency updates
 │   └── workflows/
 │       ├── terraform.yml    # Terraform fmt/validate/tflint → plan → apply
-│       └── release.yml      # Validate (lint+tests+dbt parse) → Dataproc batches → dbt
+│       ├── release.yml      # Validate (lint+tests+dbt parse) → Dataproc batches → dbt
+│       └── composer-sync.yml # Sync DAGs + dbt project to the Composer bucket
 ├── infra/
 │   ├── modules/bq_iceberg/  # Reusable Terraform module (GCS + BQ datasets + BigLake)
+│   ├── modules/composer/    # Cloud Composer 3 environment + service account
 │   └── environments/dev/    # Dev environment instantiation
 ├── gitops/
 │   ├── apps/                # Argo CD Application YAMLs (scaffolding)
@@ -63,6 +65,7 @@ GitOps_Iceberg_Data_Platform/
 ├── scripts/
 │   └── validate-local.sh    # Local Terraform-workflow reproduction (needs GCP auth)
 ├── src/
+│   ├── composer/dags/       # Airflow DAG: daily incremental month loads
 │   ├── spark_jobs/          # PySpark ETL (common.py + Bronze ingestion + Silver MERGE)
 │   └── dbt_project/         # dbt models (staging → Gold star schema) + seeds
 └── Makefile                 # Local CI-parity tasks (make help)
@@ -183,15 +186,57 @@ Two GitHub Actions workflows:
 
 - **`terraform.yml`** — on changes under `infra/`: fmt + validate + tflint, plan
   (posted to PRs), and apply on `main`.
-- **`release.yml`** — on changes under `src/`: a `validate` job (ruff, dbt parse,
-  PySpark unit + Iceberg integration tests) runs on every PR and push; on `main`
-  it continues into Dataproc Serverless batches (Bronze, Silver), registers the
-  Silver BigLake table, and runs `dbt seed/run/test`. Historical months can be
-  backfilled via `workflow_dispatch` (`ingest_year`/`ingest_month`) — submit
-  backfills **one at a time**: the concurrency group holds a single pending
-  slot, so a newly queued dispatch silently evicts an already-queued one.
-  Dispatching with `layers: dbt-only` rebuilds just the Gold layer without
-  re-running the Dataproc bronze/silver batches.
+- **`release.yml`** — on changes under `src/`: a `validate` job (ruff, DAG
+  syntax check, dbt parse, PySpark unit + Iceberg integration tests) runs on
+  every PR and push; pushes to `main` additionally upload the Spark job files
+  to `gs://<bucket>/jobs/`. The Dataproc/dbt deploy jobs run **on demand
+  only** (`workflow_dispatch`) — scheduled loads are owned by the Composer
+  DAG, and keeping CI runs on-demand avoids two concurrent Iceberg writers
+  (don't dispatch a full run while the daily DAG is mid-flight). Backfills
+  use `ingest_year`/`ingest_month` (submit **one at a time**: the concurrency
+  group holds a single pending slot, so a newly queued dispatch silently
+  evicts an already-queued one); `layers: dbt-only` rebuilds just the Gold
+  layer.
+- **`composer-sync.yml`** — on changes under `src/composer/` or
+  `src/dbt_project/`: rsyncs the Airflow DAGs and the dbt project to the
+  Composer environment's bucket (no-op when Composer is disabled).
+
+---
+
+## Orchestration (Cloud Composer)
+
+Two orchestrators with distinct responsibilities:
+
+- **GitHub Actions** — CI/CD: validation gates, deploying code artifacts,
+  and on-demand runs (backfills, `dbt-only` rebuilds).
+- **Cloud Composer (Airflow)** — scheduled data orchestration: the
+  `nyc_taxi_incremental` DAG runs daily at 06:00 UTC and loads **one new TLC
+  month per run** (stage → Bronze → Silver → BigLake registration → dbt
+  build), reusing the same job files and argument contract that CI deploys
+  to `gs://<bucket>/jobs/`.
+
+The DAG derives the next month from success markers under
+`gs://<bucket>/state/bronze_loaded/` (written only after a Bronze batch
+commits — physical data files are deliberately not trusted as state), so
+missed days, retries, and reruns all converge on the first genuinely
+missing month; once it catches up with TLC's publication lag (~2 months
+behind real time) each run skips cleanly.
+
+### Cost (PoC)
+
+A Composer environment **bills continuously** even at the smallest size
+(`ENVIRONMENT_SIZE_SMALL` ≈ $10–12/day) and cannot be paused. The
+`composer_enabled` variable in `infra/environments/dev/dev.tfvars` is the
+cost lever — set it to `false` and apply to destroy the environment between
+testing sessions (DAG state lives in the warehouse bucket, so nothing is
+lost). **Re-enabling requires two manual follow-ups**:
+
+1. After the apply finishes (~25 min), run the **Composer Sync** workflow
+   (`workflow_dispatch`) — the recreated environment gets a brand-new empty
+   bucket, and DAGs only appear once the sync runs.
+2. Deleting an environment does **not** delete its old
+   `us-east1-nyc-taxi-composer-*` bucket; remove orphaned ones manually to
+   avoid residual storage charges.
 
 ### Secrets Required
 
