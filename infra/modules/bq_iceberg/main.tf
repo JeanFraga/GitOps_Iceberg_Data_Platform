@@ -100,3 +100,18 @@ resource "google_project_iam_member" "pipeline_sa_connection_admin" {
   role    = "roles/bigquery.connectionAdmin"
   member  = "serviceAccount:${var.pipeline_service_account}"
 }
+
+# Managing the Looker (Google Cloud core) instance requires looker.admin;
+# roles/editor does not carry it.
+#
+# Deliberately granted here — ungated — rather than inside the looker module,
+# which is count-gated on looker_enabled. If the grant were created in the
+# same apply as the instance it would race IAM propagation, the same
+# eventual-consistency failure mode the composer module guards against. Living
+# here means the role is already in place long before looker_enabled flips.
+resource "google_project_iam_member" "pipeline_sa_looker_admin" {
+  count   = var.pipeline_service_account != "" ? 1 : 0
+  project = var.project_id
+  role    = "roles/looker.admin"
+  member  = "serviceAccount:${var.pipeline_service_account}"
+}

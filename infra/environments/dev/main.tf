@@ -56,6 +56,27 @@ resource "google_project_service" "composer" {
   disable_on_destroy = false
 }
 
+# Required by the Looker (Google Cloud core) instance (looker module).
+resource "google_project_service" "looker" {
+  count   = var.looker_enabled ? 1 : 0
+  project = var.project_id
+  service = "looker.googleapis.com"
+
+  disable_on_destroy = false
+}
+
+# Listed by Google as a Looker instance prerequisite. Strictly it is only
+# needed for private-connections (private services access) instances; this
+# module provisions a public-IP instance, so it is enabled defensively to
+# match the documented prerequisite list rather than out of proven necessity.
+resource "google_project_service" "servicenetworking" {
+  count   = var.looker_enabled ? 1 : 0
+  project = var.project_id
+  service = "servicenetworking.googleapis.com"
+
+  disable_on_destroy = false
+}
+
 module "data_platform" {
   source = "../../modules/bq_iceberg"
 
@@ -81,6 +102,32 @@ module "composer" {
   depends_on = [google_project_service.composer]
 }
 
+# BI demo layer. Gated behind looker_enabled and defaulted off: the
+# instance takes ~60 minutes to create, needs Looker quota on the project,
+# and needs an OAuth client that cannot be created by Terraform. See
+# infra/modules/looker/README-prereqs.md before flipping this on.
+module "looker" {
+  count  = var.looker_enabled ? 1 : 0
+  source = "../../modules/looker"
+
+  project_id          = var.project_id
+  region              = var.region
+  gold_dataset_id     = module.data_platform.bq_dataset_id
+  oauth_client_id     = var.looker_oauth_client_id
+  oauth_client_secret = var.looker_oauth_client_secret
+
+  # module.data_platform is listed explicitly: the only implicit link is the
+  # gold_dataset_id output, which depends on the dataset alone, not on the
+  # roles/looker.admin grant the instance create needs. Without this the two
+  # run in parallel and the create can beat IAM propagation — the same
+  # eventual-consistency failure the composer module guards against.
+  depends_on = [
+    google_project_service.looker,
+    google_project_service.servicenetworking,
+    module.data_platform,
+  ]
+}
+
 # -----------------------------------------------------------------
 # Outputs – surfaced from the module for convenience
 # -----------------------------------------------------------------
@@ -102,4 +149,12 @@ output "composer_dag_gcs_prefix" {
 
 output "composer_airflow_uri" {
   value = one(module.composer[*].airflow_uri)
+}
+
+output "looker_uri" {
+  value = one(module.looker[*].looker_uri)
+}
+
+output "looker_bq_service_account" {
+  value = one(module.looker[*].bq_service_account)
 }
