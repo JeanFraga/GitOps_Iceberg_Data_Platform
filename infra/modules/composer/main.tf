@@ -14,10 +14,6 @@ terraform {
   }
 }
 
-data "google_project" "this" {
-  project_id = var.project_id
-}
-
 # -----------------------------------------------------------------
 # Service account the Composer environment (and its DAG tasks) run as
 # -----------------------------------------------------------------
@@ -42,12 +38,17 @@ resource "google_project_service_identity" "composer_agent" {
   service  = "composer.googleapis.com"
 }
 
-# The Composer service agent needs this on the environment SA (scoped grant,
-# matching Google's Composer Terraform example).
-resource "google_service_account_iam_member" "composer_service_agent" {
-  service_account_id = google_service_account.composer.name
-  role               = "roles/composer.ServiceAgentV2Ext"
-  member             = "serviceAccount:${google_project_service_identity.composer_agent.email}"
+# The Composer service agent needs ServiceAgentV2Ext to manage the environment
+# on the environment SA's behalf. Granted at project level (Google's documented
+# add-iam-policy-binding for Composer 2/3) rather than scoped to the SA: the CI
+# service account has resourcemanager.projectIamAdmin but not
+# iam.serviceAccounts.setIamPolicy, so a google_service_account_iam_member here
+# fails with a 403. Same constraint as the connection-scoped grant in
+# infra/modules/bq_iceberg.
+resource "google_project_iam_member" "composer_service_agent" {
+  project = var.project_id
+  role    = "roles/composer.ServiceAgentV2Ext"
+  member  = "serviceAccount:${google_project_service_identity.composer_agent.email}"
 }
 
 # ----- Data-plane roles used by the DAG tasks ---------------------
@@ -90,11 +91,15 @@ resource "google_project_iam_member" "composer_bq_data_editor" {
 }
 
 # Dataproc Serverless batches run as the Compute Engine default SA (same as
-# the CI-submitted batches); submitting on its behalf requires actAs.
-resource "google_service_account_iam_member" "composer_act_as_compute_default" {
-  service_account_id = "projects/${var.project_id}/serviceAccounts/${data.google_project.this.number}-compute@developer.gserviceaccount.com"
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.composer.email}"
+# the CI-submitted batches); submitting on its behalf requires actAs. Granted
+# at project level for the same reason as composer_service_agent above — the
+# CI service account cannot set SA-scoped IAM policy. Broader than scoping to
+# the compute default SA (this covers actAs on any SA in the project); tighten
+# alongside the other project-level PoC grants when promoting to production.
+resource "google_project_iam_member" "composer_act_as_compute_default" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.composer.email}"
 }
 
 # -----------------------------------------------------------------
@@ -140,6 +145,6 @@ resource "google_composer_environment" "this" {
 
   depends_on = [
     google_project_iam_member.composer_worker,
-    google_service_account_iam_member.composer_service_agent,
+    google_project_iam_member.composer_service_agent,
   ]
 }
