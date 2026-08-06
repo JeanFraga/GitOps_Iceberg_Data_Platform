@@ -51,6 +51,12 @@ jobs:
         env:
           INPUT_PROJECT_ID: ${{ secrets.TF_VAR_PROJECT_ID != '' && secrets.TF_VAR_PROJECT_ID || (secrets.GCP_PROJECT_ID != '' && secrets.GCP_PROJECT_ID || vars.GCP_PROJECT_ID) }}
           INPUT_PIPELINE_SA: ${{ secrets.PIPELINE_SERVICE_ACCOUNT }}
+          # Accept either naming convention, same fallback style as the project
+          # id above. Only read when looker_enabled is true; an unset secret
+          # resolves to empty and trips the looker module's precondition, which
+          # names the missing variables explicitly.
+          INPUT_LOOKER_CLIENT_ID: ${{ secrets.TF_VAR_LOOKER_OAUTH_CLIENT_ID != '' && secrets.TF_VAR_LOOKER_OAUTH_CLIENT_ID || secrets.LOOKER_OAUTH_CLIENT_ID }}
+          INPUT_LOOKER_CLIENT_SECRET: ${{ secrets.TF_VAR_LOOKER_OAUTH_CLIENT_SECRET != '' && secrets.TF_VAR_LOOKER_OAUTH_CLIENT_SECRET || secrets.LOOKER_OAUTH_CLIENT_SECRET }}
         run: |
           project_id="${INPUT_PROJECT_ID:-$GOOGLE_CLOUD_PROJECT}"
           if [ -z "$project_id" ]; then
@@ -59,11 +65,18 @@ jobs:
           fi
           echo "TF_VAR_project_id=$project_id" >> "$GITHUB_ENV"
           echo "TF_VAR_pipeline_service_account=$INPUT_PIPELINE_SA" >> "$GITHUB_ENV"
+          echo "TF_VAR_looker_oauth_client_id=$INPUT_LOOKER_CLIENT_ID" >> "$GITHUB_ENV"
+          echo "TF_VAR_looker_oauth_client_secret=$INPUT_LOOKER_CLIENT_SECRET" >> "$GITHUB_ENV"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.8.x"
+          # Pinned to an exact patch, and kept in lockstep with the version in
+          # .devcontainer/devcontainer.json. Terraform refuses to read state
+          # written by any newer version — including a newer patch — so a
+          # floating pin here (or an unpinned devcontainer) eventually locks
+          # one environment out of the shared GCS state. Bump both together.
+          terraform_version: "1.15.8"
 
       - name: Terraform Init
         run: terraform init
