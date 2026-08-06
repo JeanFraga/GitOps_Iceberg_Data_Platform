@@ -68,8 +68,11 @@ view: dim_date {
     sql: ${TABLE}.is_weekend ;;
   }
 
+  # count_distinct, not count: this view is always joined many_to_one from
+  # fact_trips, where `type: count` would count trips rather than days.
   measure: day_count {
-    type: count
-    description: "Number of distinct calendar days matching the current filters."
+    type: count_distinct
+    sql: ${date_day} ;;
+    description: "Number of distinct calendar days present in the current result set."
   }
 }

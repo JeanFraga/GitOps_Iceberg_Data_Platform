@@ -47,8 +47,11 @@ view: dim_locations {
     description: "Convenience flag for airport-trip analysis."
   }
 
+  # count_distinct, not count: this view is always joined many_to_one from
+  # fact_trips, where `type: count` would count trips rather than zones.
   measure: location_count {
-    type: count
-    description: "Number of distinct zones matching the current filters."
+    type: count_distinct
+    sql: ${location_id} ;;
+    description: "Number of distinct zones present in the current result set."
   }
 }

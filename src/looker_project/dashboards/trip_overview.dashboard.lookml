@@ -22,7 +22,6 @@
   - name: pickup_date
     title: "Pickup Date"
     type: field_filter
-    default_value: ""
     allow_multiple_values: true
     required: false
     model: nyc_taxi
@@ -32,7 +31,6 @@
   - name: pickup_borough
     title: "Pickup Borough"
     type: field_filter
-    default_value: ""
     allow_multiple_values: true
     required: false
     model: nyc_taxi
@@ -42,7 +40,6 @@
   - name: payment_type
     title: "Payment Type"
     type: field_filter
-    default_value: ""
     allow_multiple_values: true
     required: false
     model: nyc_taxi

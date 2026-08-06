@@ -75,8 +75,9 @@ supplied in `.github/workflows/terraform.yml`). Do not commit them.
 
 ## Cost and lifecycle
 
-- Trial edition is valid for **90 days**. Editions cannot be changed after
-  creation — moving to Standard means destroy + recreate.
+- Trial edition runs **30 days** and then **auto-converts to a paid Standard
+  instance** rather than expiring — see section 1a. Editions cannot be changed
+  after creation, so moving to Standard deliberately means destroy + recreate.
 - Creation takes about **60 minutes** and cannot be paused or cancelled.
 - Provider 5.x has no `deletion_policy` argument, so `terraform destroy` fails
   if the instance still holds nested resources

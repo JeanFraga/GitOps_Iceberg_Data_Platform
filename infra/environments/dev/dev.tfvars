@@ -9,8 +9,10 @@ force_destroy = true
 # apply to destroy it between PoC testing sessions.
 composer_enabled = true
 
-# BI demo. Creation takes ~60 minutes and cannot be cancelled, and the trial
-# edition is valid for 90 days. Requires Looker trial quota on the project and
+# BI demo. Creation takes ~60 minutes and cannot be cancelled. The trial runs
+# 30 days and then AUTO-CONVERTS to a paid Standard instance rather than
+# expiring — destroy before day 30 to avoid billing. Requires trial quota
+# (register at https://cloud.google.com/resources/looker-free-trial) and
 # a hand-created OAuth client supplied via TF_VAR_looker_oauth_client_id /
 # TF_VAR_looker_oauth_client_secret — see infra/modules/looker/README-prereqs.md.
 #

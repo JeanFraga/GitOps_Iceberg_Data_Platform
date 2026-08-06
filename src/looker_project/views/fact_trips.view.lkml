@@ -154,9 +154,13 @@ view: fact_trips {
   }
 
   # ---------------------------------------------------------------
-  # Money — hidden as dimensions, surfaced through measures.
-  # Row-level currency columns are rarely useful in an Explore and
-  # clutter the field picker, so they stay hidden and aggregate.
+  # Money. The fare components are hidden and surfaced through
+  # measures — row-level currency columns clutter the field picker
+  # without being much use on their own.
+  #
+  # total_amount is the exception and stays visible: it is the single
+  # headline per-trip value, and it appears in the `detail` drill set
+  # below where a user clicking into a measure expects to see it.
   # ---------------------------------------------------------------
 
   dimension: total_amount {
