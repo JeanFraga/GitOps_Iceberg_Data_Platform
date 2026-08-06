@@ -3,8 +3,9 @@
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
 
-lint: ## Ruff lint for the Spark jobs
-	ruff check src/spark_jobs
+lint: ## Ruff lint for the Spark jobs and Composer DAGs
+	ruff check src/spark_jobs src/composer
+	find src/composer/dags -name '*.py' -exec python -m py_compile {} +
 
 test: ## PySpark unit + Iceberg integration tests
 	pytest src/spark_jobs/tests/ -v

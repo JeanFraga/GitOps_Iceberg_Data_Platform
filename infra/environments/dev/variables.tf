@@ -20,3 +20,9 @@ variable "pipeline_service_account" {
   type        = string
   default     = ""
 }
+
+variable "composer_enabled" {
+  description = "Provision the Cloud Composer environment (bills ~$10-12/day even at the smallest size; disable between testing sessions)"
+  type        = bool
+  default     = false
+}

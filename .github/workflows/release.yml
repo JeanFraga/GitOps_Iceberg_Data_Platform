@@ -82,7 +82,12 @@ jobs:
         run: pip install -r src/dbt_project/requirements.txt -r src/spark_jobs/requirements.txt
 
       - name: Lint (ruff)
-        run: ruff check src/spark_jobs
+        run: ruff check src/spark_jobs src/composer
+
+      # Syntax gate for the Composer DAG (airflow itself is not installed here;
+      # full parse happens on the Composer environment after composer-sync).
+      - name: Compile Composer DAGs
+        run: find src/composer/dags -name '*.py' -exec python -m py_compile {} +
 
       - name: dbt parse check
         working-directory: src/dbt_project
@@ -94,7 +99,40 @@ jobs:
         run: pytest src/spark_jobs/tests/ -v
 
   # -----------------------------------------------------------------------
-  # Job 2 – Submit Bronze ingestion Dataproc Serverless batch
+  # Job 2 – Upload Spark job files (the artifacts Composer's DAG submits)
+  # -----------------------------------------------------------------------
+  sync-jobs:
+    name: Upload Spark jobs to GCS
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Upload PySpark jobs to GCS
+        run: |
+          if [ -z "$GCP_PROJECT_ID" ]; then
+            echo "GCP_PROJECT_ID is empty. Set the TF_VAR_PROJECT_ID (or GCP_PROJECT_ID) repository secret." >&2
+            exit 1
+          fi
+          gsutil cp src/spark_jobs/ingest_bronze.py src/spark_jobs/bronze_to_silver.py \
+            src/spark_jobs/common.py "gs://${GCP_PROJECT_ID}-iceberg-warehouse/jobs/"
+
+  # -----------------------------------------------------------------------
+  # Job 3 – Submit Bronze ingestion Dataproc Serverless batch
+  # (workflow_dispatch only: scheduled loads are owned by the Composer DAG,
+  # and keeping CI runs on-demand avoids two concurrent Iceberg writers)
   # -----------------------------------------------------------------------
   ingest-bronze:
     name: Ingest Bronze (Dataproc Serverless)
@@ -102,9 +140,9 @@ jobs:
     permissions:
       contents: read
     needs: validate
-    # Empty inputs (push events) run everything; dbt-only dispatches skip the
-    # Dataproc layers (silver-etl then skips via the needs cascade).
-    if: github.ref == 'refs/heads/main' && github.event.inputs.layers != 'dbt-only'
+    # dbt-only dispatches skip the Dataproc layers (silver-etl then skips
+    # via the needs cascade).
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.event.inputs.layers != 'dbt-only'
 
     steps:
       - uses: actions/checkout@v7
@@ -165,7 +203,7 @@ jobs:
             --period="${PERIOD}"
 
   # -----------------------------------------------------------------------
-  # Job 3 – Submit Silver ETL Dataproc Serverless batch
+  # Job 4 – Submit Silver ETL Dataproc Serverless batch
   # -----------------------------------------------------------------------
   silver-etl:
     name: Silver ETL (Dataproc Serverless)
@@ -232,7 +270,7 @@ jobs:
              OPTIONS (format = 'ICEBERG', uris = ['${METADATA_URI}'])"
 
   # -----------------------------------------------------------------------
-  # Job 4 – dbt build (Gold layer)
+  # Job 5 – dbt build (Gold layer)
   # -----------------------------------------------------------------------
   dbt-run:
     name: dbt Run (Gold Layer)
