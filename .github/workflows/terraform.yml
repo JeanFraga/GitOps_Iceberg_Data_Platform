@@ -71,7 +71,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.8.x"
+          # Pinned to an exact patch, and kept in lockstep with the version in
+          # .devcontainer/devcontainer.json. Terraform refuses to read state
+          # written by any newer version — including a newer patch — so a
+          # floating pin here (or an unpinned devcontainer) eventually locks
+          # one environment out of the shared GCS state. Bump both together.
+          terraform_version: "1.15.8"
 
       - name: Terraform Init
         run: terraform init
