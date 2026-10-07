@@ -1,0 +1,33 @@
+---
+title: Reconciliation of Prior PRD Reviews against Updated PRD
+date: 2026-10-07
+inputs: review-adversarial.md, review-healthcare-domain.md, review-rubric.md, prd-healthcare-dv-platform-upgrade.md (updated 2026-10-07), addendum.md
+---
+
+# Reconciliation of Prior Reviews
+
+**Verdict:** Nearly all findings are addressed. One finding was deliberately reversed and needs the user to acknowledge it: the dbt Fusion risk (H3). One required change was deliberately deferred: PHI hardening (domain F5). The update leaves a few internal inconsistencies, and it introduces three new ones. None of them blocks architecture work.
+
+## Addressed (closed)
+- **Adversarial:** C1 (calibrated score, half-open bands, metric denominators, B-cubed, must-not-link, max cluster size, held-out evaluation seed, train/test split by person), H1 (content-hashed names, no lock), H2 (local Spark for scheduled runs, Dataproc capped at 10 runs, enforcement points in FR-34, budget alert stated as an alert), M1 (Iceberg decided, VARIANT and `_FILE_NAME` corrected, JSON string column), M2 (CI volume profile, Airflow factory, pinned Composer image), M3 (reversal status rows, survivorship, late files, atomic write-back, quarantine replay, local steward, run lock), M4 SM-2 part, L1 (all items).
+- **Domain:** F1, F2, F3, F4, F6 and F7 are fully reflected (FR-2, FR-4, FR-13, FR-14, FR-22, FR-24, FR-26, FR-31 to FR-33). The optional Synthea suggestion was not adopted, which is acceptable.
+- **Rubric:** cost contradictions, the Fusion exit criterion (SM-8), done-ness for FR-23, FR-25, FR-26, FR-28 and FR-30, FR-20 disagreement, FR-21 promotion gate, band gap, open-question triage (deferred table D-1 to D-10), confirmed targets, title line, golden key and Business Vault glossary, SM-6 window.
+
+## Deliberately reversed or deferred (user acknowledgment needed)
+1. **H3 risk inverted (adversarial H3 and NFR-7).** The reviewers recommended keeping dbt Core as the blocking build and Fusion as non-blocking. NFR-7 and SM-8 now make Fusion the only blocking build, with Core only as a fallback. The spine records this as a decision. But the original risk is now on the critical path: Fusion's adapter and package maturity, the in-house macros on Fusion (FR-15), and the "dbt 2.0" product name, which the Vision and NFR-7 still use. *Fix:* add an early Fusion smoke test as a Phase 1 gate, comparable to the Iceberg smoke test in D-6. Add a stated trigger for falling back to Core. Use the product name "dbt Fusion engine".
+2. **Domain F5 deferred.** Safe Harbor, HMAC tokens, policy tags and the restricted dataset were moved to §8.4 Future Enhancement (decision in §11 item 12). Gold is read directly, and NFR-4 keeps PHI tags as metadata only. This is consistent because the data is synthetic-only, but the domain reviewer had marked these as required changes. *Fix:* none needed beyond recording that the reviewer's required change #5 was declined by decision.
+3. **Adversarial M4 MVP cut declined.** §8.1 explicitly decides on no MVP cut. This is closed by decision.
+
+## Still unaddressed or partially addressed
+- **(medium) SM-2 measurement depends on a Phase 2 item.** SM-2 says Payer C onboarding is measured in Phase 1. But the CI job that onboards Payer C is a consequence of FR-30, and FR-30 is still in Phase 2 (§8.1 lists FR-1 to FR-29 and FR-31 to FR-40). *Fix:* move the Payer C CI job into FR-29's consequences, or move FR-30 into Phase 1 and leave only the written guide in Phase 2. (Rubric high finding, adversarial M4.)
+- **(low) Effectivity satellites still deferred.** §8.3 defers effectivity satellites, while FR-18 now requires active/ended status rows with effective timestamps on same-as links, which are effectively effectivity semantics. *Fix:* add a note in §8.3 that MPI link status is in scope. (Adversarial M3.)
+- **(low) BigQuery time-travel and fail-safe storage.** Storage from rewritten tables (7+7 days) and from idempotency reruns is not budgeted per layer. NFR-1 only requires that the default volume fits the budget. *Fix:* add a storage-per-layer estimate in the architecture, or rely on FR-34's scratch expiration. (Adversarial H2.)
+- **(low) Per-run Dataproc cost ceiling has no value.** FR-12 says the ceiling is in configuration but gives no number, so it cannot be checked against USD 5 / 10 runs. *Fix:* state a default, for example USD 0.30 per run. (Adversarial H2.)
+- **(low) §4.2 description vs FR-6.** The §4.2 description says "Every column is a string", while FR-6 and the glossary say nested files are one JSON string column per record. *Fix:* align the description. (Adversarial M1 residue.)
+
+## New issues introduced by the update
+- **(medium) SM-10 conflicts with the CLI-first loop.** §4.12 defers end-to-end testing of Actions to a late Phase 1 milestone, and the inner loop is the CLI. But SM-10 (median of the last 10 `main` deploys under 15 minutes) and NFR-10 assume that Actions deploys run routinely. Ten Actions deploys may never happen in the POC. *Fix:* measure SM-10 only after the Actions milestone, with a smaller N, or make it post-POC.
+- **(medium) The public exposure of the Cloud Run dashboard is unspecified.** FR-25 deploys Streamlit to Cloud Run, reading Gold directly, including the `DIM_PATIENTS` cross-payer tile. The domain reviewer's concern about a public UI with PHI-like data, which the PRD handled for the steward app, is not applied to the dashboard. *Fix:* require authenticated access (no `allUsers` invoker, or IAP), or aggregate-only tiles with no person-level names.
+- **(low) Teardown vs never-deleted landing.** Landing and Bronze are "never deleted" (FR-5, FR-6). FR-34's teardown deletes datasets and Dataproc but leaves landing and Bronze unaddressed, and Archive's 365-day minimum is charged on early deletion (§6). The "idle about $0" claim then rests on small residual storage. *Fix:* state that teardown at the end of the POC either keeps landing and Bronze (with the residual cost stated) or deletes them and accepts the early-deletion charge.
+- **(low) Default-volume runtime inconsistency.** FR-1 and §4.1 say full-size generation runs on opt-in Dataproc. NFR-8 says default-volume runs "may run locally or on Dataproc". *Fix:* align the two, or explicitly allow local default-volume runs.
+- **(low) Mechanical.** FR-36 and FR-37 sit between FR-4 and FR-5, so the FR numbers are not in order in the document. NFR-1 has a lowercase sentence start ("the Streamlit dashboard"). The addendum §A verbatim text still contains the superseded terms, but the corrections note in addendum line 18 covers them, which is acceptable.
