@@ -4,26 +4,26 @@
 id = 1
 type = "story"
 title = "Clean main and thread demo profile to a first apply"
-description = "Runs git rm on src/composer, src/dbt_project, src/looker_project, src/spark_jobs, gitops/, infra/modules/looker, infra/modules/composer, infra/modules/bq_iceberg and the composer-sync, release and terraform workflows, and strips the Makefile targets that point at them. Checks (hitl) that the v1 GCP resources, destroyed outside the loop, are gone while the state bucket stays. Then runs the thinnest config-to-Terraform path: git mv infra/environments/dev infra/environments/demo, config/profiles/demo.yaml with region us-east1, a loader at config/load.py run by `make resolve` that writes config/resolved.yaml (entry 3 extends this loader, it does not create a new one), and the demo environment yamldecodes it and applies the `ops` dataset only, no tables (entry 7 adds them), from the CLI. The demo environment pins google and google-beta ~> 5 and Terraform 1.15.8, as entry 2 expects."
-verify = "`git ls-remote --tags --heads origin v1` returns a ref. On main, `git ls-files src/composer src/dbt_project src/looker_project src/spark_jobs gitops infra/modules/looker infra/modules/composer infra/modules/bq_iceberg infra/environments/dev .github/workflows/composer-sync.yml .github/workflows/release.yml .github/workflows/terraform.yml` prints nothing. The user runs `gcloud composer environments list --locations=<v1 region>`, `bq ls` and `gcloud storage ls` and sees no v1 resources, and `gcloud storage ls gs://<tfstate-bucket>` succeeds. After `make resolve`, `terraform apply` in infra/environments/demo creates the `ops` dataset in us-east1, and `grep -rn us-east1 infra/` prints nothing."
+description = "Runs git rm on src/composer, src/dbt_project, src/looker_project, src/spark_jobs, gitops/, infra/modules/looker, infra/modules/composer, infra/modules/bq_iceberg and the composer-sync, release and terraform workflows, and strips the Makefile targets that point at them. Checks that the v1 GCP resources, already destroyed on 2026-10-07, are gone while the state bucket stays. Then runs the thinnest config-to-Terraform path: git mv infra/environments/dev infra/environments/demo, config/profiles/demo.yaml with region us-east1, a loader at config/load.py run by `make resolve` that writes config/resolved.yaml (entry 3 extends this loader, it does not create a new one), and the demo environment yamldecodes it and applies the `ops` dataset only, no tables (entry 7 adds them), from the CLI with `terraform apply -auto-approve`. The demo environment pins google and google-beta ~> 5 and Terraform 1.15.8, as entry 2 expects."
+verify = "`git ls-remote --tags --heads origin v1` returns a ref. On main, `git ls-files src/composer src/dbt_project src/looker_project src/spark_jobs gitops infra/modules/looker infra/modules/composer infra/modules/bq_iceberg infra/environments/dev .github/workflows/composer-sync.yml .github/workflows/release.yml .github/workflows/terraform.yml` prints nothing. The builder runs `gcloud composer environments list --locations=<v1 region>`, `bq ls` and `gcloud storage ls` and sees no v1 resources, and `gcloud storage ls gs://<tfstate-bucket>` succeeds. After `make resolve`, `terraform apply` in infra/environments/demo creates the `ops` dataset in us-east1, and `grep -rn us-east1 infra/` prints nothing."
 covers = ["CAP-14"]
 after = []
-hitl = true
+hitl = false
+notes = ["Use cli commands that can auto approve"]
 risk = "high"
-plan_checkpoint = true
 references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#migration-from-the-current-repo", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-19", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-1"]
 
 [[entry]]
 id = 2
 type = "story"
 title = "Step the Google providers 5 to 8.6.0"
-description = "Steps google and google-beta from 5 to 6, then 7, then 8.6.0 on infra/environments/demo. At each step the user runs `terraform plan` from the CLI with their own credentials and reviews it (hitl), and a multi-platform .terraform.lock.hcl is committed."
+description = "Steps google and google-beta from 5 to 6, then 7, then 8.6.0 on infra/environments/demo. At each step the builder runs `terraform plan` from the CLI and records the output in the ticket plan, and a multi-platform .terraform.lock.hcl is committed."
 verify = "At 8.6.0, `terraform plan` in infra/environments/demo reports no changes, the plan output of each step is recorded in the ticket, and `terraform providers lock -platform=linux_amd64 -platform=darwin_arm64 -platform=linux_arm64` leaves the committed lockfile unchanged."
 covers = ["CAP-14", "CAP-16"]
 after = [1]
-hitl = true
+hitl = false
+notes = ["Use cli commands that can auto approve"]
 risk = "high"
-plan_checkpoint = true
 references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#migration-from-the-current-repo", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-20"]
 
 [[entry]]
@@ -66,37 +66,38 @@ references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthca
 id = 6
 type = "story"
 title = "Separate service accounts and the landing no-delete rule"
-description = "Creates the deploy, runtime and dashboard SAs with no JSON keys in infra/modules/iam and sets up CLI impersonation of the deploy SA. Adds the landing bucket in infra/modules/storage, where the runtime SA can write objects but not delete them, and writes an NFR-9 IAM and bucket-policy review section in the ticket plan file. The user applies from the CLI."
-verify = "The user runs `gcloud storage rm gs://<landing>/probe --impersonate-service-account=<runtime-sa>` and gets 403, `gcloud iam service-accounts keys list --managed-by=user` is empty for all three SAs, and the ticket plan has the NFR-9 section."
+description = "Creates the deploy, runtime and dashboard SAs with no JSON keys in infra/modules/iam and sets up CLI impersonation of the deploy SA. Adds the landing bucket in infra/modules/storage, where the runtime SA can write objects but not delete them, and writes an NFR-9 IAM and bucket-policy review section in the ticket plan file. The builder applies from the CLI with `terraform apply -auto-approve`."
+verify = "The builder runs `gcloud storage rm gs://<landing>/probe --impersonate-service-account=<runtime-sa>` and gets 403, `gcloud iam service-accounts keys list --managed-by=user` is empty for all three SAs, and the ticket plan has the NFR-9 section."
 covers = ["CAP-14"]
 after = [2]
-hitl = true
+hitl = false
+notes = ["Use cli commands that can auto approve"]
 risk = "high"
-plan_checkpoint = true
 references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-18", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-3"]
 
 [[entry]]
 id = 7
 type = "story"
 title = "Ops, steward and mpi_eval datasets and the warehouse store"
-description = "Adds tables to the `ops` dataset resource that entry 1 created (no second declaration), the steward and mpi_eval datasets, with schemas under infra/modules/bq_ops/schemas/*.json, including `ops.run_events` with the Dataproc run counter and `ops.run_lock` (lock_key, run_id, acquired_at, expires_at), used by entry 10's stub. Extends infra/modules/storage with the Iceberg warehouse bucket and adds the BigLake REST catalog, all named from config. The user applies from the CLI."
-verify = "After the user's `terraform apply` in infra/environments/demo, `bq show --schema` for every declared table diffs clean against its schemas/*.json file, and the catalog and warehouse bucket exist in us-east1."
+description = "Adds tables to the `ops` dataset resource that entry 1 created (no second declaration), the steward and mpi_eval datasets, with schemas under infra/modules/bq_ops/schemas/*.json, including `ops.run_events` with the Dataproc run counter and `ops.run_lock` (lock_key, run_id, acquired_at, expires_at), used by entry 10's stub. Extends infra/modules/storage with the Iceberg warehouse bucket and adds the BigLake REST catalog, all named from config. The builder applies from the CLI with `terraform apply -auto-approve`."
+verify = "After `terraform apply -auto-approve` in infra/environments/demo, `bq show --schema` for every declared table diffs clean against its schemas/*.json file, and the catalog and warehouse bucket exist in us-east1."
 covers = ["CAP-14"]
 after = [6]
-hitl = true
+hitl = false
+notes = ["Use cli commands that can auto approve"]
 risk = "medium"
-plan_checkpoint = true
 references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-24", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-10", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-4"]
 
 [[entry]]
 id = 8
 type = "story"
 title = "Cost guardrails and teardown"
-description = "Adds budget alerts at 50%, 90% and 100% of USD 5 on the billing account named in the profile, a bytes-cap lint (`make lint-bytes-cap PROFILE=...`) that fails when a profile has no cap, and `make teardown`, which destroys everything except the state bucket. The owner grants roles/billing.costsManager on the billing account to the deploy SA, and the user runs teardown, apply and the billing check (hitl)."
+description = "Adds budget alerts at 50%, 90% and 100% of USD 5 on the billing account named in the profile, a bytes-cap lint (`make lint-bytes-cap PROFILE=...`) that fails when a profile has no cap, and `make teardown`, which destroys everything except the state bucket. The builder creates the budget alerts directly with the owner's gcloud credentials (`gcloud billing budgets create ... --quiet`), granting no billing role to any service account, and runs teardown, apply (`-auto-approve`) and the billing check itself."
 verify = "`make lint-bytes-cap PROFILE=config/tests/fixtures/no_cap.yaml` exits nonzero, `gcloud billing budgets list` shows the three thresholds, and `make teardown` followed by `make apply` leaves `terraform plan` in infra/environments/demo clean with the state bucket intact."
 covers = ["CAP-14"]
 after = [4, 7]
-hitl = true
+hitl = false
+notes = ["Use cli commands that can auto approve"]
 risk = "medium"
 references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-16"]
 
@@ -134,7 +135,6 @@ covers = ["CAP-16"]
 after = [2, 5]
 hitl = false
 risk = "medium"
-plan_checkpoint = true
 references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-20"]
 
 [[entry]]
