@@ -18,7 +18,7 @@ id = 3
 slug = "epic-landing-bronze"
 title = "Immutable landing, Bronze Iceberg, Spark runtime"
 covers = ["CAP-2", "CAP-3", "CAP-5"]
-after = [{ epic = 1, needs = "Bronze smoke gate passed (whole-epic gate), fingerprint.py, lifecycle.yaml, buckets, catalog, run-identity stub" }, { epic = 2, needs = "committed samples" }]
+after = [{ epic = 1, needs = "fingerprint.py, lifecycle.yaml, buckets, catalog, run-identity stub" }, { epic = 2, needs = "committed samples" }]
 
 [[epic]]
 id = 4

@@ -3,7 +3,7 @@ type: epic
 title: "Immutable landing, Bronze Iceberg, Spark runtime"
 parent: initiative-healthcare-dv-platform-upgrade
 covers: [CAP-2, CAP-3, CAP-5]
-after: [epic-platform-baseline]
+after: []
 assignee: ""
 risk: high
 ---
@@ -61,3 +61,4 @@ Follows the capability boundary: landing, `edi/` pre-parse, the WAP writer, reco
 - Decision: 2026-10-07 — user accepted the recommended split; this epic stays whole for CAP-2, CAP-3 and CAP-5 and carries the only whole-epic gate, on the E1 Bronze smoke.
 - Unknown: OQ 2 and OQ 3 are resolved as E1 smoke-gate outcomes; their results set this epic's high risk and may reshape it.
 - Parked: deferred PHI hardening under AD-14 (tokenization, restricted dataset, de-identification views, policy tags, audit logs, delete locks); all data is synthetic.
+- Decision: the whole-epic gate on E1 was removed since the Bronze smoke was dropped; entries pin 1.4, 1.6, 1.7 and 1.10 instead. OQ 2, 3 and 5 risk lands on the first Bronze story (2026-10-07).
