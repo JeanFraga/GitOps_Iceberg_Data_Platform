@@ -2,7 +2,7 @@
 # Runtime SA gets create + read only, so delete and overwrite are denied by IAM.
 
 terraform {
-  required_version = ">= 1.15.8"
+  required_version = ">= 1.16.5"
 
   required_providers {
     google = {

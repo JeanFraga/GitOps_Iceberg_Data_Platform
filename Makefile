@@ -26,6 +26,12 @@ phi-scan: ## FR-35: fail on PHI-shaped values (SSN, generated names). PATH=dir, 
 marker-check: ## AD-14: fail on data files without the synthetic marker. PATH=dir, default repo
 	$(GUARD) marker-check $(SCAN_PATH)
 
+upgrade: ## Manual platform upgrade (AD-20/FR-40): prints the platform-upgrade skill invocation
+	@echo "Platform upgrades run through the Claude Code skill .claude/skills/platform-upgrade."
+	@echo "In Claude Code, run:  /platform-upgrade"
+	@echo "Scope one component with an argument, e.g.  /platform-upgrade terraform 1.16.5"
+	@echo "Then: make validate && make tf-plan (no stateful replacements), commit one change set."
+
 lint: ## Ruff lint + format check over Python sources
 	uv run ruff check .
 	uv run ruff format --check .
@@ -47,4 +53,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: help upgrade phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

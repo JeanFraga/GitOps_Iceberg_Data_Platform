@@ -2,7 +2,7 @@
 # No google_service_account_key anywhere: CLI impersonates, Actions uses WIF (E12).
 
 terraform {
-  required_version = ">= 1.15.8"
+  required_version = ">= 1.16.5"
 
   required_providers {
     google = {
