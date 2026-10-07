@@ -1,0 +1,55 @@
+# AD-22 schema fingerprint specification and golden vectors.
+spec:
+  output: SHA-256 of the layout lines joined by '\n' (UTF-8), lowercase hex; fp8 = first 8 chars
+  formats:
+    csv: ordered header names of the first row (RFC 4180), leading BOM ignored, each NFC, trimmed, lowercased; no header row
+      is an error
+    jsonl:
+      rule: sorted set of top-level keys across the first N non-blank records; records split on LF only (trailing CR stripped)
+      N: 100
+    x12: distinct segment ids in first-occurrence order of the first ST..SE transaction set; separators from ISA (element
+      at offset 3, ISA16 terminator at offset 105)
+  implementation: config/fingerprint.py (single implementation; loader and onboarding CLI import it)
+golden_vectors:
+- name: csv_basic
+  format: csv
+  input: "member_id,First Name,dob\r\nM1,Ann,2000-01-01\r\n"
+  layout:
+  - member_id
+  - first name
+  - dob
+  sha256: d156507f0f7940d1da43c7d54b72981a465b0ef7309db3fae1e7ef3640f69bd6
+  fp8: d156507f
+- name: csv_bom_quoted_nfc
+  format: csv
+  input: "\uFEFF\" Member_ID \",\"Café\"\nx,y\n"
+  layout:
+  - member_id
+  - café
+  sha256: 973d4fe36a083ede308220dbed9c740cd2fae8cb227c137f539dd1079e9ca28b
+  fp8: 973d4fe3
+- name: jsonl_union_sorted
+  format: jsonl
+  input: '{"b":1,"a":2}
+
+
+    {"c":{"x":1},"a":3}
+
+    '
+  layout:
+  - a
+  - b
+  - c
+  sha256: ea7fb08b7a2dc4619ffb7c7bb38d95a2047935fa165d71b12efd3852a2e6d0cc
+  fp8: ea7fb08b
+- name: x12_first_transaction_set
+  format: x12
+  input: ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *240105*1000*^*00501*000000001*0*P*:~GS*HC*S*R*20240105*1000*1*X*005010X222A1~ST*837*0001*005010X222A1~BHT*0019*00*1*20240105*1000*CH~NM1*85*2*PROV~CLM*1*100~NM1*85*2*PROV2~CLM*2*50~SE*8*0001~ST*837*0002~REF*X*Y~SE*3*0002~GE*2*1~IEA*1*000000001~
+  layout:
+  - ST
+  - BHT
+  - NM1
+  - CLM
+  - SE
+  sha256: fefad578873725f82c4c4a499a1f00331ef9ccb9eea60d79e7585d24cbe05a9f
+  fp8: fefad578

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lifecycle.schema.json",
+  "title": "File lifecycle enum (config/standards/lifecycle.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["states", "initial", "transitions", "silver_reads_from"],
+  "properties": {
+    "states": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["landed", "bronze_appended", "reconciled", "silver_loaded", "vault_loaded", "rejected_duplicate", "quarantined"]},
+      "minItems": 7,
+      "maxItems": 7
+    },
+    "initial": {"const": "landed"},
+    "transitions": {
+      "type": "object",
+      "propertyNames": {"enum": ["landed", "bronze_appended", "reconciled", "silver_loaded", "vault_loaded", "rejected_duplicate", "quarantined"]},
+      "additionalProperties": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {"enum": ["landed", "bronze_appended", "reconciled", "silver_loaded", "vault_loaded", "rejected_duplicate", "quarantined"]}
+      }
+    },
+    "silver_reads_from": {"const": "reconciled"}
+  }
+}

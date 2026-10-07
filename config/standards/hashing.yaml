@@ -1,0 +1,152 @@
+# AD-7 hash specification and golden vectors. Every engine must run these; the Python
+# engine runs them via config/test_golden_vectors.py (CI wiring lands with E12).
+# `canonical` is the exact MD5 input; `md5` = MD5(canonical UTF-8), uppercase hex.
+spec:
+  algorithm: MD5
+  output: uppercase hex STRING
+  normalization:
+  - Unicode NFC
+  - trim ASCII whitespace (space, tab, LF, CR, VT, FF)
+  - ASCII uppercase for business keys only; hashdiff values are not case-folded
+  - empty string -> NULL -> sentinel '^^'
+  - escape '\' as '\\' and '|' as '\|' in values
+  delimiter: '||'
+  null_sentinel: ^^
+  canonical_formats:
+    date: ISO-8601 YYYY-MM-DD
+    timestamp: UTC YYYY-MM-DDTHH:MM:SS.ffffffZ (naive timestamps rejected)
+    decimal: plain notation, no trailing zeros, no exponent; zero is '0'; NaN/Infinity rejected
+    boolean: true/false
+    float: forbidden; use decimal
+  column_order: business-key components in recipe order (qualifier first); hashdiff columns in config order, never alphabetical
+  all_null_business_key: rejected
+  forbidden:
+  - FARM_FINGERPRINT
+  business_key_recipes: config/standards/business_keys.yaml (added with the vault epics; per-hub vectors land with it)
+golden_vectors:
+- name: bk_simple
+  kind: business_key
+  values:
+  - v: PAYERA
+  - v: '123'
+  canonical: PAYERA||123
+  md5: C2816EFE379E1435F0670BAA12201F6B
+- name: bk_uppercase_ascii
+  kind: business_key
+  values:
+  - v: payer_a
+  - v: ab12
+  canonical: PAYER_A||AB12
+  md5: EE5ED120357310C32856D233B945102B
+- name: bk_non_ascii_not_folded
+  kind: business_key
+  values:
+  - v: müller
+  canonical: MüLLER
+  md5: 8CBB93DE8F25EC16C40ACD70EEE51704
+- name: bk_trim_ascii_whitespace
+  kind: business_key
+  values:
+  - v: "  X1\t"
+  canonical: X1
+  md5: BB7F5AE6220C9828E5EC91FAF054197C
+- name: bk_nfc_non_ascii_not_folded
+  kind: business_key
+  values:
+  - v: Café
+  canonical: CAFé
+  md5: 8939E231102341962E63FA66B4AA0EB1
+- name: bk_empty_is_null_sentinel
+  kind: business_key
+  values:
+  - v: P1
+  - v: ''
+  - v: null
+  canonical: P1||^^||^^
+  md5: 3986D8C33EEFFF815AA1D6D865B40AE2
+- name: bk_escape_pipe_and_backslash
+  kind: business_key
+  values:
+  - v: a|b
+  - v: c\d
+  canonical: A\|B||C\\D
+  md5: C380FB32E5C8840B9C7EEF34E567D59D
+- name: hashdiff_no_case_fold
+  kind: hashdiff
+  values:
+  - v: Smith
+  - v: jane
+  canonical: Smith||jane
+  md5: 00ED6002A88BF2950D61B2A049EE6CEF
+- name: hashdiff_order_from_config
+  kind: hashdiff
+  values:
+  - v: jane
+  - v: Smith
+  canonical: jane||Smith
+  md5: 946A1D530B3FA8754DEF58ADF3366E60
+- name: hashdiff_date_iso
+  kind: hashdiff
+  values:
+  - v: '2024-01-05'
+    type: date
+  canonical: '2024-01-05'
+  md5: 323C5117B1EDC8AE79283A7EB1FF9201
+- name: hashdiff_timestamp_utc
+  kind: hashdiff
+  values:
+  - v: '2024-01-05T10:00:00+02:00'
+    type: timestamp
+  canonical: '2024-01-05T08:00:00.000000Z'
+  md5: 06FB66C292EDEA8746AF55110D2A39CA
+- name: hashdiff_decimal_no_trailing_zeros
+  kind: hashdiff
+  values:
+  - v: '12.3400'
+    type: decimal
+  - v: '100'
+    type: decimal
+  - v: '0.000'
+    type: decimal
+  canonical: 12.34||100||0
+  md5: 1AFFE0988E4E242831624A92FE7EAB77
+- name: hashdiff_boolean
+  kind: hashdiff
+  values:
+  - v: true
+    type: boolean
+  - v: false
+    type: boolean
+  canonical: true||false
+  md5: C494C3E2541129B2045CB9344796BA54
+- name: hashdiff_all_null_allowed
+  kind: hashdiff
+  values:
+  - v: null
+  - v: ' '
+  canonical: ^^||^^
+  md5: 8DCFFD779E848FF7273B6CAEB4698D1E
+- name: bk_all_null_rejected
+  kind: business_key
+  values:
+  - v: null
+  - v: '  '
+  error: all_null_business_key
+- name: hashdiff_naive_timestamp_rejected
+  kind: hashdiff
+  values:
+  - v: '2024-01-05T10:00:00'
+    type: timestamp
+  error: naive_timestamp
+- name: hashdiff_float_rejected
+  kind: hashdiff
+  values:
+  - v: 1.5
+    type: float
+  error: float
+- name: hashdiff_non_finite_decimal_rejected
+  kind: hashdiff
+  values:
+  - v: NaN
+    type: decimal
+  error: non_finite_decimal

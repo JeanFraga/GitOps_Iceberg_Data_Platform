@@ -18,6 +18,7 @@ REPO_CONFIG = Path(__file__).resolve().parent
 VALID_DEFAULTS = (
     "flags:\n  workflows_enabled: false\n  composer_enabled: false\n"
     "  dataproc_schedule_enabled: false\n  ml_fallback_enabled: true\n"
+    "drift:\n  data_drift_thresholds: null\n  mode: report_only\n"
 )
 VALID_PROFILE = "profile: demo\nproject_id: demo-project-1\nregion: us-east1\n"
 
@@ -27,6 +28,7 @@ def _contract(tmp_path, defaults=VALID_DEFAULTS, profile=VALID_PROFILE):
     (tmp_path / "config").mkdir()
     d = _setup(tmp_path / "config", defaults, {"demo": profile})
     shutil.copytree(REPO_CONFIG / "schemas", d / "schemas")
+    shutil.copytree(REPO_CONFIG / "standards", d / "standards")
     (tmp_path / "versions.yaml").write_text('dataproc_runtime: "3.0"\n')
     return d
 
@@ -37,7 +39,7 @@ def test_happy_path_writes_deterministic_resolved(tmp_path):
     first = out.read_text()
     assert first.startswith("# GENERATED")
     body = first.splitlines()[1:]
-    assert body[0] == "flags:" and body[1] == "  composer_enabled: false"
+    assert body[0] == "drift:" and body[1] == "  data_drift_thresholds: null"
     load.write_resolved("demo", d)
     assert out.read_text() == first
 
@@ -114,3 +116,15 @@ def test_cost_flag_on_in_defaults_blocks_write(tmp_path):
     d = _contract(tmp_path, defaults=VALID_DEFAULTS.replace("composer_enabled: false", "composer_enabled: true"))
     assert load.main(["--profile", "demo"], d) == 1
     assert not (d / "resolved.yaml").exists()
+
+
+def test_repo_d7_drift_key_defaults_to_report_only():
+    assert load.resolve("demo")["drift"] == {"data_drift_thresholds": None, "mode": "report_only"}
+
+
+def test_unknown_lifecycle_state_fails_validation(tmp_path, capsys):
+    d = _contract(tmp_path)
+    path = d / "standards" / "lifecycle.yaml"
+    path.write_text(path.read_text().replace("  - quarantined\n", "  - archived\n", 1))
+    assert load.main(["--profile", "demo", "--validate-only"], d) == 1
+    assert "lifecycle.yaml" in capsys.readouterr().err

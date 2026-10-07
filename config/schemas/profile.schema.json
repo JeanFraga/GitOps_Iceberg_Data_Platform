@@ -5,22 +5,84 @@
   "description": "Validates defaults.yaml deep-merged with config/profiles/<profile>.yaml plus versions.yaml. Later entries add keys here as they add them to the contract.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["profile", "project_id", "region", "flags", "versions"],
+  "required": [
+    "profile",
+    "project_id",
+    "region",
+    "flags",
+    "versions",
+    "drift"
+  ],
   "properties": {
-    "profile": {"type": "string", "pattern": "^[a-z_][a-z0-9_]*$"},
-    "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"},
-    "region": {"type": "string", "pattern": "^[a-z]+-[a-z]+[0-9]+$"},
+    "profile": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*$"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"
+    },
+    "region": {
+      "type": "string",
+      "pattern": "^[a-z]+-[a-z]+[0-9]+$"
+    },
     "flags": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["workflows_enabled", "composer_enabled", "dataproc_schedule_enabled", "ml_fallback_enabled"],
+      "required": [
+        "workflows_enabled",
+        "composer_enabled",
+        "dataproc_schedule_enabled",
+        "ml_fallback_enabled"
+      ],
       "properties": {
-        "workflows_enabled": {"type": "boolean", "default": false},
-        "composer_enabled": {"type": "boolean", "default": false},
-        "dataproc_schedule_enabled": {"type": "boolean", "default": false},
-        "ml_fallback_enabled": {"type": "boolean", "default": true}
+        "workflows_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "composer_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "dataproc_schedule_enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "ml_fallback_enabled": {
+          "type": "boolean",
+          "default": true
+        }
       }
     },
-    "versions": {"type": "object"}
+    "versions": {
+      "type": "object"
+    },
+    "drift": {
+      "description": "D-7 data-drift thresholds. Unknown until decided: unset thresholds mean report only (no Gold block).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data_drift_thresholds",
+        "mode"
+      ],
+      "properties": {
+        "data_drift_thresholds": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "mode": {
+          "enum": [
+            "report_only",
+            "block"
+          ]
+        }
+      }
+    }
   }
 }

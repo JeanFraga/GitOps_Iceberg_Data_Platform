@@ -1,0 +1,21 @@
+# AD-4 / AD-10 closed file-lifecycle enum. Every ops.file_lifecycle row carries one of
+# these states; stages discover work from the latest state per file_sha256.
+states:
+  - landed
+  - bronze_appended
+  - reconciled
+  - silver_loaded
+  - vault_loaded
+  - rejected_duplicate
+  - quarantined
+initial: landed
+transitions:
+  landed: [bronze_appended, rejected_duplicate]
+  bronze_appended: [reconciled, quarantined]
+  reconciled: [silver_loaded, quarantined]
+  silver_loaded: [vault_loaded]
+  vault_loaded: []
+  rejected_duplicate: []
+  quarantined: [reconciled, landed]
+# Silver reads only files whose latest state is this one.
+silver_reads_from: reconciled

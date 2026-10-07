@@ -74,6 +74,17 @@ def check_defaults(config_dir: Path = CONFIG_DIR) -> None:
         raise ConfigError(f"defaults.yaml flags off-contract: {', '.join(bad)}")
 
 
+def validate_standards(config_dir: Path = CONFIG_DIR) -> None:
+    """lifecycle.yaml matches its schema and its transitions form a closed graph over the states."""
+    lifecycle = _read(config_dir / "standards" / "lifecycle.yaml")
+    schema = json.loads((config_dir / "schemas" / "lifecycle.schema.json").read_text())
+    errors = [e.message for e in Draft202012Validator(schema).iter_errors(lifecycle)]
+    if not errors and set(lifecycle["transitions"]) != set(lifecycle["states"]):
+        errors.append("transitions must list every state exactly once")
+    if errors:
+        raise ConfigError("lifecycle.yaml violations:\n  " + "\n  ".join(errors))
+
+
 def render(profile: str, config_dir: Path = CONFIG_DIR) -> str:
     """Validated resolved.yaml text for a profile."""
     resolved = resolve(profile, config_dir)
@@ -110,6 +121,7 @@ def main(argv: list[str] | None = None, config_dir: Path = CONFIG_DIR) -> int:
     try:
         if args.validate_only:
             render(args.profile, config_dir)
+            validate_standards(config_dir)
             print(f"ok: profile {args.profile}")
         elif args.check:
             if is_stale(args.profile, config_dir):

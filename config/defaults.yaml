@@ -5,3 +5,7 @@ flags:
   composer_enabled: false
   dataproc_schedule_enabled: false
   ml_fallback_enabled: true
+# D-7 (open): data-drift thresholds are unset, so drift is reported, never blocking.
+drift:
+  data_drift_thresholds: null
+  mode: report_only
