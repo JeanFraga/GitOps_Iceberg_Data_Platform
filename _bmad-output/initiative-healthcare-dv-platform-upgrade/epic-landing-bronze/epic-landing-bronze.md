@@ -59,6 +59,5 @@ Follows the capability boundary: landing, `edi/` pre-parse, the WAP writer, reco
 - Waits on epic-platform-baseline because: the Bronze smoke gate (runtime 3.0, Iceberg 1.12.0: create, append, BigQuery read) must pass with owner review before any E3 work starts, since an OQ 2/3 failure reshapes this epic; it also needs `fingerprint.py`, `lifecycle.yaml`, buckets, catalog, the run-identity stub and the marker rule.
 - Waits on epic-synthetic-data because: it needs the committed samples (story-level need in tickets.toml, not a whole-epic gate).
 - Decision: 2026-10-07 — user accepted the recommended split; this epic stays whole for CAP-2, CAP-3 and CAP-5 and carries the only whole-epic gate, on the E1 Bronze smoke.
-- Unknown: OQ 2 and OQ 3 are resolved as E1 smoke-gate outcomes; their results set this epic's high risk and may reshape it.
 - Parked: deferred PHI hardening under AD-14 (tokenization, restricted dataset, de-identification views, policy tags, audit logs, delete locks); all data is synthetic.
 - Decision: the whole-epic gate on E1 was removed since the Bronze smoke was dropped; entries pin 1.4, 1.6, 1.7 and 1.10 instead. OQ 2, 3 and 5 risk lands on the first Bronze story (2026-10-07).
