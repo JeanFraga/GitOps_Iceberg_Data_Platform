@@ -90,3 +90,4 @@ Not in scope:
 - Decision: the breakdown runs under bmad-build-auto. plan_checkpoint is set on the high-risk entries (migration, provider stepping, IAM/SA, datasets, upgrade), and there is no done_checkpoint because hitl covers the person steps (2026-10-07).
 - Decision: Makefile target appends by entries 3, 8, 9, 10 and 11 are accepted as parallel append-only edits to the skeleton entry 5 owns (2026-10-07).
 - Decision: the user approved the story set ("Stories look good"), so entries 1 and 7 stay whole rather than split (2026-10-07).
+- Decision: the epic runs fully unattended under bmad-build-auto: no story needs a person, no plan checkpoints, and the builder runs every CLI apply and gcloud change itself (`terraform apply -auto-approve`, `gcloud --quiet`); budget alerts are created with the owner's credentials, with no billing role granted to a service account. User's words: "Use cli commands that can auto approve" (2026-10-07).
