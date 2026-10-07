@@ -8,6 +8,9 @@ python -c "import pyspark; print('PySpark', pyspark.__version__)"
 dbt --version
 terraform -version | head -1
 gcloud --version | head -1
+uv --version
+node --version
+claude --version
 
 echo ""
 echo "Dev container ready."
