@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "profile.schema.json",
+  "title": "Resolved client profile (AD-1 config contract)",
+  "description": "Validates defaults.yaml deep-merged with config/profiles/<profile>.yaml plus versions.yaml. Later entries add keys here as they add them to the contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "project_id", "region", "flags", "versions"],
+  "properties": {
+    "profile": {"type": "string", "pattern": "^[a-z_][a-z0-9_]*$"},
+    "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"},
+    "region": {"type": "string", "pattern": "^[a-z]+-[a-z]+[0-9]+$"},
+    "flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflows_enabled", "composer_enabled", "dataproc_schedule_enabled", "ml_fallback_enabled"],
+      "properties": {
+        "workflows_enabled": {"type": "boolean", "default": false},
+        "composer_enabled": {"type": "boolean", "default": false},
+        "dataproc_schedule_enabled": {"type": "boolean", "default": false},
+        "ml_fallback_enabled": {"type": "boolean", "default": true}
+      }
+    },
+    "versions": {"type": "object"}
+  }
+}

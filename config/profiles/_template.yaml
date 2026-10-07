@@ -1,0 +1,5 @@
+# Onboarding profile (AD-19): copy to config/profiles/<client>.yaml and set the
+# client's own GCP project and region. Everything else comes from defaults.yaml.
+profile: _template
+project_id: client-project-id
+region: us-central1

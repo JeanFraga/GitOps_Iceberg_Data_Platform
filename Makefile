@@ -8,6 +8,12 @@ help: ## Show available targets
 resolve: ## Resolve config (defaults + PROFILE + versions.yaml) into config/resolved.yaml
 	uv run python config/load.py --profile $(PROFILE)
 
+validate-config: ## Validate defaults and every profile (demo, _template) against the JSON Schema
+	@for p in demo _template; do uv run python config/load.py --profile $$p --validate-only || exit 1; done
+
+check-resolved: ## Fail if config/resolved.yaml is stale or hand-edited (CI calls this)
+	uv run python config/load.py --profile $(PROFILE) --check
+
 lint: ## Ruff lint + format check over Python sources
 	uv run ruff check .
 	uv run ruff format --check .
@@ -27,6 +33,6 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 		echo "tflint not installed; skipping"; \
 	fi
 
-validate: lint test tf-validate tflint ## Run all local checks (later entries append targets here)
+validate: lint test validate-config check-resolved tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help resolve lint test tf-validate tflint validate
+.PHONY: help resolve validate-config check-resolved lint test tf-validate tflint validate

@@ -49,3 +49,4 @@ secrets/
 .env
 .env.*
 !.env.example
+!config/schemas/*.json
