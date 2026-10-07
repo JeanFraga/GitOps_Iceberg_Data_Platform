@@ -3,19 +3,26 @@ title: 'Clean main and thread demo profile to a first apply'
 type: 'chore'
 ticket: '1'
 created: '2026-10-07'
-status: 'done'
+status: 'built'
 baseline_revision: '73522b819124f42bc64aeddd6a00ea01243a42d3'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context: []
 warnings: []
-deferred: []
+deferred:
+  - summary: >-
+      .github/dependabot.yml still targets removed paths (src/spark_jobs, src/dbt_project, infra/environments/dev).
+    evidence: |-
+      Pre-existing config left untouched by plan; entry 11 deletes dependabot.yml. Dependabot runs error until then.
+    location: >-
+      .github/dependabot.yml
+    severity: low
 ---
 
 <intent-contract>
@@ -86,6 +93,16 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-10-07 — Review pass
+- verdicts: 6 findings — high 0, medium 1, low 4, false 0, maybe-false 0 (plus one confirmation that grep AC is met, not a finding)
+- findings:
+  - `[medium]` `[patch]` post-create.sh imports pyspark and runs dbt, both no longer installed — removed lines 7-8.
+  - `[low]` `[patch]` Dockerfile label/PYSPARK_PYTHON describe removed PySpark/dbt — reworded label, dropped PYSPARK_PYTHON.
+  - `[low]` `[reject]` .terraform.lock.hcl still gitignored so provider pins not reproducible — entry 2 owns lockfile commit by design; intent excludes it.
+  - `[low]` `[defer]` dependabot.yml targets removed paths — pre-existing file reserved for entry 11.
+  - `[low]` `[reject]` missing-profile test doesn't pre-create resolved.yaml — code resolves before writing so behavior is correct; extra test adds little.
+  - `[low]` `[reject]` no stale-resolved.yaml check wired into validate — entry 3 owns the stale check per ticket text.
+
 ## Design Notes
 
 AD-1 names `config/clients/` and `config/loader.py`; the ticket (later and more specific, and what entry 3 extends) names `config/profiles/` and `config/load.py` and a single `config/resolved.yaml`. Follow the ticket.
@@ -98,3 +115,12 @@ AD-1 names `config/clients/` and `config/loader.py`; the ticket (later and more 
 - `make tf-validate` -- expected: pass
 - `terraform -chdir=infra/environments/demo plan -detailed-exitcode` -- expected: exit 0 after apply
 - `grep -rn us-east1 infra/` -- expected: no output
+
+## Auto Run Result
+
+- Summary: v1 taxi tree removed from main (preserved on origin/v1 a5f3931); config/defaults.yaml + profiles/demo.yaml -> config/load.py (`make resolve`) -> config/resolved.yaml -> infra/environments/demo yamldecode; `ops` dataset applied in us-east1 from CLI.
+- Files: config/{load.py,test_load.py,defaults.yaml,profiles/demo.yaml,resolved.yaml} new; infra/environments/demo/main.tf (moved+rewritten); Makefile (resolve, demo paths); .devcontainer Dockerfile/post-create.sh (drop PySpark/dbt); .gitignore, README.md trimmed; v1 dirs/workflows/scripts removed.
+- Review: 2 patches (1 medium, 1 low), 1 deferred (dependabot), 3 rejected (reasons in triage log).
+- Follow-up review recommended: false (patched: medium 1, low 1).
+- Verification: pytest config/ 3 passed; make tf-validate pass; grep us-east1 infra/ empty; terraform plan -detailed-exitcode = 0; bq ls / composer list / storage ls show no v1 resources; state bucket readable.
+- Residual risks: lockfile uncommitted until entry 2; old terraform/dev state object (empty) remains in bucket.

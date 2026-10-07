@@ -4,8 +4,6 @@
 set -euo pipefail
 
 echo "==> Verifying toolchain …"
-python -c "import pyspark; print('PySpark', pyspark.__version__)"
-dbt --version
 terraform -version | head -1
 gcloud --version | head -1
 uv --version
