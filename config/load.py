@@ -76,8 +76,8 @@ def check_defaults(config_dir: Path = CONFIG_DIR) -> None:
 
 def render(profile: str, config_dir: Path = CONFIG_DIR) -> str:
     """Validated resolved.yaml text for a profile."""
-    check_defaults(config_dir)
     resolved = resolve(profile, config_dir)
+    check_defaults(config_dir)
     validate(resolved, config_dir)
     return HEADER + yaml.safe_dump(_sorted(resolved), sort_keys=False, default_flow_style=False)
 
