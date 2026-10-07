@@ -1,0 +1,40 @@
+# Glossary — Healthcare DV Platform Upgrade
+
+- **Payer feed:** a file extract from a health plan: eligibility (ANSI 834-style), claims (837P/I/D) or pharmacy (NCPDP-style).
+- **EMR feed:** facility patient and encounter data in HL7 FHIR R4 (Patient, Encounter, Condition, Procedure), on US Core profiles.
+- **Member:** a person enrolled with one payer, identified by `payer_id + subscriber_id + person_code`. Subscriber IDs are unique only within a payer and are shared by dependents.
+- **Patient:** a person known to one EMR, identified by `emr_system_id + MRN`. A patient is not a member; the MPI resolves both into persons.
+- **Claim / claim line:** an 837 CLM header and its service lines. A claim can have several versions (frequency 1 original, 7 replacement, 8 void; 835 adjustments); the latest effective version is the one counted.
+- **Coverage span:** one eligibility period for a member under one product line (Commercial, Medicaid, Medicare) and plan, with effective and term dates.
+- **Source:** one payer or EMR feed from one named sender (Payer A, Payer B, EMR Facility 1).
+- **Schema era:** a layout version of one source feed. It is identified by schema fingerprint, not by date.
+- **Schema fingerprint:** a deterministic hash of a file's header or segment layout, computed the same way by the Bronze loader and the onboarding tooling. An unknown fingerprint creates an unmapped era. An additive-only superset of a mapped era's columns maps to that era.
+- **Mapping:** a versioned configuration that projects one (source, era) onto a canonical schema. There is exactly one mapping per pair.
+- **Canonical schema:** the Silver contract for one entity. There are eight: claim, claim_line, eligibility, remittance_835, pharmacy, provider, patient, encounter.
+- **Landing zone:** immutable byte-for-byte storage under content-hashed names. Objects tier to colder classes and are never deleted by the pipeline; `terraform destroy` deletes them at POC teardown (production requires a delete lock).
+- **Processing log (file lifecycle):** an append-only record of each file's state (landed, Bronze-appended, reconciled, Silver-loaded, vault-loaded, rejected duplicate, quarantined) and of run events. Stages find their work from it.
+- **Quarantine:** the state of a file that failed reconciliation, has an unmapped era, or exceeded the cast-failure threshold. Its rows stay in Bronze until it is fixed and replayed.
+- **Bronze:** a 1:1 raw replica of landing, with one Iceberg table per (source, feed, era). Columns are strings, or one JSON string column for nested formats. It is append-once, never updated or expired during the POC (destroyed at teardown; production requires a delete lock), and is the system of record once reconciled. Bronze is the only Iceberg layer.
+- **Silver staging:** canonical, typed records produced by the mapping engine, stored as native BigQuery tables.
+- **Drift (schema drift):** a new, missing or renamed column, or a value that fails to cast, measured against the mapping.
+- **Data drift:** a shift in values or distribution while the schema stays valid.
+- **Drift report:** the per-file drift record written by each normalization run.
+- **Sample file:** a committed 1,000-record excerpt of one generated feed file.
+- **Raw Vault:** hubs, links and satellites loaded from Silver with no business rules.
+- **Hub / Link / Satellite:** DV 2.0 objects holding business keys, relationships, and SCD2 descriptive history.
+- **Record source:** the lineage tag on every vault row, naming its source and era.
+- **Business Vault:** derived objects: the MPI results, computed claim attributes and PIT tables.
+- **MPI:** the Master Patient Index, the process and output that resolve members and patients into golden keys.
+- **Golden person key:** `HUB_PERSON.golden_person_hk`, the surviving master identifier, linked to members and patients and owned by the MPI. "Golden key" and "member key" in Gold mean this key.
+- **Match score:** the calibrated `match_probability` of a pair, not the raw match weight. Calibration is checked against a held-out ground-truth slice.
+- **Match band:** new [0, 0.50), edge [0.50, 0.90), auto [0.90, 1.00].
+- **Must-not-link:** a constraint that forbids two records from sharing a golden key, even through transitive closure. It comes from a steward "no match"/must-not-link decision or a configured rule.
+- **Training seed / evaluation seed:** disjoint generator seeds. Models are trained only on the training seed, and metrics are reported only on the evaluation seed.
+- **ML fallback:** the second-stage classifier for edge-case pairs, which uses non-demographic context.
+- **Steward queue:** edge pairs with an ML score in [0, 0.95) that await a human decision.
+- **Steward decision:** match, no match, must-not-link, unmerge or defer, recorded with who, when and why.
+- **Ground truth:** the generator's record-to-true-person mapping.
+- **Gold:** the star schema and OBT keyed on the golden key, read directly by consumers in the POC.
+- **Future Enhancement phase:** designed but unbuilt work (PHI hardening, Atmos), started only by a named trigger (real PHI or a client engagement; Atmos at 3+ clients or multiple environments per client).
+- **Client profile:** one client's configuration: sources, mappings, environment, thresholds, cost limits and flags.
+- **Run:** one full or partial pipeline execution for a period, identified by a run ID.
