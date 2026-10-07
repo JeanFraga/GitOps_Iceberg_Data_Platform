@@ -34,6 +34,26 @@ provider "google-beta" {
   region  = local.cfg.region
 }
 
+# Principals allowed to impersonate the deploy and runtime SAs. Identities are not
+# committed: `make tf-apply` passes the active gcloud account.
+variable "impersonators" {
+  description = "IAM members allowed to impersonate the deploy and runtime SAs"
+  type        = list(string)
+}
+
+module "iam" {
+  source        = "../../modules/iam"
+  project_id    = local.cfg.project_id
+  impersonators = var.impersonators
+}
+
+module "storage" {
+  source         = "../../modules/storage"
+  project_id     = local.cfg.project_id
+  region         = local.cfg.region
+  runtime_member = module.iam.runtime_sa_member
+}
+
 resource "google_bigquery_dataset" "ops" {
   dataset_id                 = "ops"
   location                   = local.cfg.region
@@ -42,4 +62,20 @@ resource "google_bigquery_dataset" "ops" {
 
 output "ops_dataset_id" {
   value = google_bigquery_dataset.ops.dataset_id
+}
+
+output "deploy_sa_email" {
+  value = module.iam.deploy_sa_email
+}
+
+output "runtime_sa_email" {
+  value = module.iam.runtime_sa_email
+}
+
+output "dashboard_sa_email" {
+  value = module.iam.dashboard_sa_email
+}
+
+output "landing_bucket" {
+  value = module.storage.landing_bucket
 }
