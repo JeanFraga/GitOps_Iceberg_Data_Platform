@@ -14,6 +14,18 @@ validate-config: ## Validate defaults and every profile (demo, _template) agains
 check-resolved: ## Fail if config/resolved.yaml is stale or hand-edited (CI calls this)
 	uv run python config/load.py --profile $(PROFILE) --check
 
+# The ticket's interface is `make phi-scan PATH=dir`, which overrides make's own PATH for
+# recipes. Only then do recipes run uv with a fixed system PATH (devcontainer and CI locations).
+SCAN_PATH := $(if $(filter command line,$(origin PATH)),$(PATH),)
+TOOL_PATH := /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(HOME)/.local/bin:$(HOME)/.cargo/bin
+GUARD = $(if $(SCAN_PATH),/usr/bin/env PATH="$(TOOL_PATH)") uv run python tools/guardrails.py
+
+phi-scan: ## FR-35: fail on PHI-shaped values (SSN, generated names). PATH=dir, default repo
+	$(GUARD) phi-scan $(SCAN_PATH)
+
+marker-check: ## AD-14: fail on data files without the synthetic marker. PATH=dir, default repo
+	$(GUARD) marker-check $(SCAN_PATH)
+
 lint: ## Ruff lint + format check over Python sources
 	uv run ruff check .
 	uv run ruff format --check .
@@ -33,6 +45,6 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 		echo "tflint not installed; skipping"; \
 	fi
 
-validate: lint test validate-config check-resolved tf-validate tflint ## Run all local checks (later entries append targets here)
+validate: lint test validate-config check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: help phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
