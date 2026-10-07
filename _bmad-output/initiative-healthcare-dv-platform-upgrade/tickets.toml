@@ -1,0 +1,84 @@
+# Epics of initiative-healthcare-dv-platform-upgrade, in build order.
+
+[[epic]]
+id = 1
+slug = "epic-platform-baseline"
+title = "Platform baseline, migration, config contract and guardrails"
+covers = ["CAP-14", "CAP-16"]
+
+[[epic]]
+id = 2
+slug = "epic-synthetic-data"
+title = "Synthetic healthcare data generator"
+covers = ["CAP-1"]
+after = [{ epic = 1, needs = "config loader, region, landing bucket, synthetic-marker rule, mpi_eval DDL, bytes caps" }]
+
+[[epic]]
+id = 3
+slug = "epic-landing-bronze"
+title = "Immutable landing, Bronze Iceberg, Spark runtime"
+covers = ["CAP-2", "CAP-3", "CAP-5"]
+after = [{ epic = 1, needs = "Bronze smoke gate passed (whole-epic gate), fingerprint.py, lifecycle.yaml, buckets, catalog, run-identity stub" }, { epic = 2, needs = "committed samples" }]
+
+[[epic]]
+id = 4
+slug = "epic-silver-normalization"
+title = "Config-driven Silver, drift and quarantine"
+covers = ["CAP-4"]
+after = [{ epic = 1, needs = "config contract and D-7 drift key" }, { epic = 3, needs = "reconciled Bronze tables" }]
+
+[[epic]]
+id = 5
+slug = "epic-raw-vault"
+title = "Raw Data Vault including coverage, provider and pharmacy"
+covers = ["CAP-6", "CAP-7"]
+after = [{ epic = 1, needs = "naming standards and bytes caps" }, { epic = 2, needs = "ground truth and samples" }, { epic = 4, needs = "Silver tables" }]
+
+[[epic]]
+id = 6
+slug = "epic-mpi"
+title = "MPI, evaluation harness and retrain gate"
+covers = ["CAP-8"]
+after = [{ epic = 1, needs = "mpi_eval DDL, model bucket pattern" }, { epic = 2, needs = "ground truth" }, { epic = 5, needs = "Raw Vault hubs and sats" }]
+
+[[epic]]
+id = 7
+slug = "epic-steward-review"
+title = "Steward review UI"
+covers = ["CAP-9"]
+after = [{ epic = 6, needs = "MPI match candidates and review queue contract" }]
+
+[[epic]]
+id = 8
+slug = "epic-business-vault-gold"
+title = "Business Vault and Gold"
+covers = ["CAP-10"]
+after = [{ epic = 1, needs = "bytes-cap lint" }, { epic = 5, needs = "Raw Vault" }, { epic = 6, needs = "golden person key" }]
+
+[[epic]]
+id = 9
+slug = "epic-consumption"
+title = "Dashboard and extract stubs"
+covers = ["CAP-11"]
+after = [{ epic = 1, needs = "dashboard SA" }, { epic = 8, needs = "Gold marts" }]
+
+[[epic]]
+id = 10
+slug = "epic-orchestration"
+title = "Single DAG spec, runner and resumability"
+covers = ["CAP-12"]
+after = [{ epic = 1, needs = "run-identity stub and ops DDL" }, { epic = 3, needs = "Bronze tasks" }, { epic = 4, needs = "Silver tasks" }, { epic = 5, needs = "Raw Vault tasks" }, { epic = 6, needs = "MPI tasks" }, { epic = 8, needs = "Gold tasks" }]
+
+[[epic]]
+id = 11
+slug = "epic-client-onboarding"
+title = "Client profile proof (Payer C)"
+covers = ["CAP-13"]
+after = [{ epic = 1, needs = "profile template" }, { epic = 10, needs = "runner and make e2e-local" }]
+
+[[epic]]
+id = 12
+slug = "epic-continuous-delivery"
+title = "GitHub Actions CD milestone"
+covers = ["CAP-15"]
+after = [{ epic = 1, needs = "state bucket and SA pattern" }, { epic = 9, needs = "dashboard container" }, { epic = 10, needs = "DAG spec and make e2e-local" }]
