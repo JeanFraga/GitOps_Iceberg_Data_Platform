@@ -1,4 +1,0 @@
-pyspark==3.5.9
-# CI / dev tooling
-pytest>=9.1.1,<10
-ruff==0.15.22

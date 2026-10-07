@@ -1,0 +1,7 @@
+# Shared defaults. Profiles in config/profiles/ are deep-merged over this file
+# by config/load.py. Cost-bearing flags default false (AD-1).
+flags:
+  workflows_enabled: false
+  composer_enabled: false
+  dataproc_schedule_enabled: false
+  ml_fallback_enabled: true
