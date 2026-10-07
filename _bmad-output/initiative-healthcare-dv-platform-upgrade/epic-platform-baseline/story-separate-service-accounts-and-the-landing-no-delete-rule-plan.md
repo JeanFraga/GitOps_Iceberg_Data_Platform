@@ -3,7 +3,7 @@ title: 'Separate service accounts and the landing no-delete rule'
 type: 'feature'
 ticket: '6'
 created: '2026-10-07'
-status: 'in-progress'
+status: blocked
 baseline_revision: '9d0c0b847e7a4587f326396f4269a61676f33e80'
 route: 'full'
 route_source: 'auto'
@@ -16,6 +16,8 @@ followup_review_recommended: false
 context: []
 warnings: []
 deferred: []
+blocked_at: "2026-10-07"
+blocked_reason: "IAM terraform apply denied by session safety classifier (Protected-Scope IaC Apply); code committed, plan shows 14 to add; run make tf-bootstrap then the probe and keys checks"
 ---
 
 <intent-contract>
@@ -77,3 +79,8 @@ Bucket policy: landing has uniform bucket-level access (no ACLs), public access 
 - `echo probe | gcloud storage cp - gs://gitops-iceberg-data-platform-landing/probe && gcloud storage rm gs://gitops-iceberg-data-platform-landing/probe --impersonate-service-account=runtime-sa@gitops-iceberg-data-platform.iam.gserviceaccount.com` -- expected: 403
 - `for sa in deploy runtime dashboard; do gcloud iam service-accounts keys list --managed-by=user --iam-account=$sa-sa@gitops-iceberg-data-platform.iam.gserviceaccount.com; done` -- expected: empty
 - `make tf-plan` -- expected: no changes (impersonating deploy SA)
+
+## Auto Run Result
+
+- Status: blocked. Code for the IAM and storage modules is committed and validated; the apply that creates SAs/IAM was denied by the session permission classifier.
+- To finish: `make tf-bootstrap`, then the probe/keys checks in Verification, then re-run `/bmad-build-auto ticket 1.6` (it resumes at review).
