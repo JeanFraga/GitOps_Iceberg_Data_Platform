@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 LABEL maintainer="GitOps Iceberg Data Platform"
 LABEL description="Development container with PySpark, dbt, and Java; Terraform, gcloud, Node.js and Claude Code come from devcontainer features"
