@@ -5,8 +5,15 @@ PROFILE ?= demo
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
 
-resolve: ## Resolve config (defaults + PROFILE, default demo) into config/resolved.yaml
-	uv run --no-project --with pyyaml python config/load.py --profile $(PROFILE)
+resolve: ## Resolve config (defaults + PROFILE + versions.yaml) into config/resolved.yaml
+	uv run python config/load.py --profile $(PROFILE)
+
+lint: ## Ruff lint + format check over Python sources
+	uv run ruff check .
+	uv run ruff format --check .
+
+test: ## Pytest (config loader and later suites)
+	uv run pytest
 
 tf-validate: ## Terraform fmt + validate (no cloud credentials needed)
 	terraform fmt -check -recursive
@@ -20,6 +27,6 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 		echo "tflint not installed; skipping"; \
 	fi
 
-validate: resolve tf-validate tflint ## Run all local checks
+validate: lint test tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help resolve tf-validate tflint validate
+.PHONY: help resolve lint test tf-validate tflint validate

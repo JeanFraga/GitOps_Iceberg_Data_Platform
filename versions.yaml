@@ -1,0 +1,14 @@
+# Non-registry version pins (AD-20). Read by config/load.py into resolved.yaml
+# (key `versions`), and from there by Terraform, CI and runners.
+# Terraform and provider pins stay native: required_providers + .terraform.lock.hcl.
+# Python packages stay in pyproject.toml + uv.lock.
+dataproc_runtime: "3.0"
+iceberg_spark_runtime: "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.12.0"
+dbt_fusion: "2.0.6"
+# Inert: pinned for the record, not used until their flags/epics turn them on.
+composer_image:
+  version: "composer-3-airflow-3.3.1-build.2"
+  inert: true
+astronomer_cosmos:
+  version: "1.15.1"
+  inert: true

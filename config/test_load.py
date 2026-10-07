@@ -1,10 +1,8 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import load  # noqa: E402
+import load
 
 
 def _setup(tmp_path, defaults, profiles):
@@ -37,3 +35,16 @@ def test_missing_profile_exits_nonzero_and_writes_nothing(tmp_path, capsys):
 def test_nested_merge(tmp_path):
     d = _setup(tmp_path, "flags:\n  a: false\n  b: true\n", {"p": "flags:\n  a: true\n"})
     assert load.resolve("p", d) == {"flags": {"a": True, "b": True}}
+
+
+def test_versions_pins_resolved_under_versions_key(tmp_path):
+    (tmp_path / "config").mkdir()
+    d = _setup(tmp_path / "config", "a: 1\n", {"demo": "profile: demo\n"})
+    (tmp_path / "versions.yaml").write_text('dataproc_runtime: "3.0"\n')
+    assert load.resolve("demo", d)["versions"] == {"dataproc_runtime": "3.0"}
+
+
+def test_repo_versions_yaml_is_resolved():
+    resolved = load.resolve("demo")
+    assert resolved["versions"]["dataproc_runtime"] == "3.0"
+    assert resolved["versions"]["iceberg_spark_runtime"].endswith(":1.12.0")

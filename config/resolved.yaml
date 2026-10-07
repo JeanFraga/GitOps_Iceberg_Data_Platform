@@ -7,3 +7,13 @@ flags:
 profile: demo
 project_id: gitops-iceberg-data-platform
 region: us-east1
+versions:
+  astronomer_cosmos:
+    inert: true
+    version: 1.15.1
+  composer_image:
+    inert: true
+    version: composer-3-airflow-3.3.1-build.2
+  dataproc_runtime: '3.0'
+  dbt_fusion: 2.0.6
+  iceberg_spark_runtime: org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.12.0

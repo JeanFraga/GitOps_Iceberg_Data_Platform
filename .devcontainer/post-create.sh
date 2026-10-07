@@ -10,6 +10,9 @@ uv --version
 node --version
 claude --version
 
+echo "==> Syncing Python project (uv.lock)"
+uv sync --frozen
+
 echo ""
 echo "Dev container ready."
 echo "See README.md for the quick-start and run 'make help' for common tasks."

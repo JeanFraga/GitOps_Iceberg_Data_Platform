@@ -1,7 +1,9 @@
-"""Resolve platform config: defaults deep-merged with a profile.
+"""Resolve platform config: defaults deep-merged with a profile, plus versions.yaml.
 
 Usage: python config/load.py [--profile demo]
-Writes config/resolved.yaml. Deep-merge logic lives only here.
+Writes config/resolved.yaml. Deep-merge logic lives only here. The `versions` key
+comes only from the repo-root versions.yaml and replaces any `versions` key in
+defaults or the profile.
 """
 
 from __future__ import annotations
@@ -30,15 +32,20 @@ def deep_merge(base: dict, override: dict) -> dict:
 def _read(path: Path) -> dict:
     data = yaml.safe_load(path.read_text()) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"{path} must contain a mapping")
+        raise TypeError(f"{path} must contain a mapping")
     return data
 
 
 def resolve(profile: str, config_dir: Path = CONFIG_DIR) -> dict:
+    """Defaults deep-merged with the profile, plus the versions.yaml pins under `versions`."""
     profile_path = config_dir / "profiles" / f"{profile}.yaml"
     if not profile_path.is_file():
         raise FileNotFoundError(f"profile not found: {profile} ({profile_path})")
-    return deep_merge(_read(config_dir / "defaults.yaml"), _read(profile_path))
+    resolved = deep_merge(_read(config_dir / "defaults.yaml"), _read(profile_path))
+    versions_file = config_dir.parent / "versions.yaml"
+    if versions_file.is_file():
+        resolved["versions"] = _read(versions_file)
+    return resolved
 
 
 def _sorted(value):
@@ -60,7 +67,7 @@ def main(argv: list[str] | None = None, config_dir: Path = CONFIG_DIR) -> int:
     args = parser.parse_args(argv)
     try:
         out = write_resolved(args.profile, config_dir)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, TypeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"wrote {out}")
