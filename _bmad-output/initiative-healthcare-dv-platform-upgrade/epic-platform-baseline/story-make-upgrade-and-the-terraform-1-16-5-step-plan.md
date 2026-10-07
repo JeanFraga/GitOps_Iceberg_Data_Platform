@@ -53,9 +53,9 @@ Platform-upgrade skill flow, scoped by the ticket to Terraform:
 ## Review Triage Log
 
 ### 2026-10-07 — Review pass
-- verdicts: 6 findings — high 0, medium 0, low 2, false 4, maybe-false 0
+- verdicts: 6 findings — high 0, medium 1, low 2, false 3, maybe-false 0
 - findings:
-  - `[false]` `[reject]` `make tf-plan` target missing — it exists (Makefile, added in 1.6); the reviewer only saw this diff.
+  - `[medium]` `[patch]` `make tf-plan` target missing — correct: the 1.6 Makefile edit was in the command the permission classifier denied, so tf-bootstrap/tf-plan/tf-apply never landed. Added in a follow-up commit (initially triaged false in error).
   - `[false]` `[reject]` `make upgrade` only prints, epic says runs end to end — the ticket text defines it as printing the skill invocation (the skill is interactive, run inside Claude Code).
   - `[low]` `[defer]` skill's 7-day wait and confirmation step skipped — user instructed an unattended run and the ticket names 1.16.5; deferred for owner confirmation.
   - `[false]` `[reject]` modules' `>= 1.16.5` floor is tighter than needed — the ticket AC requires `grep 1.15.8 infra/` to print nothing.
@@ -74,7 +74,7 @@ Platform-upgrade skill flow, scoped by the ticket to Terraform:
 
 - Summary: Terraform pinned to 1.16.5 (devcontainer feature, demo root, modules), `make upgrade` prints the platform-upgrade skill invocation, dependabot.yml deleted.
 - Files: .devcontainer/devcontainer.json, infra/environments/demo/main.tf, infra/modules/{iam,storage}/main.tf, Makefile, .github/dependabot.yml (deleted).
-- Review: 0 patches, 1 deferred (release-age / confirmation exception), 5 rejected.
+- Review: 1 patch (medium, follow-up commit), 1 deferred (release-age / confirmation exception), 5 rejected.
 - Follow-up review recommended: false.
 - Verification: grep 1.15.8 empty; terraform version 1.16.5 (local binary); make validate exit 0; plan 14 add / 0 change / 0 destroy.
 - Residual risks: devcontainer rebuild not exercised here (no Docker).

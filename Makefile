@@ -44,6 +44,22 @@ tf-validate: ## Terraform fmt + validate (no cloud credentials needed)
 	TF_DATA_DIR=.terraform-validate terraform -chdir=infra/environments/demo init -backend=false -input=false > /dev/null
 	TF_DATA_DIR=.terraform-validate terraform -chdir=infra/environments/demo validate
 
+TF_DIR := infra/environments/demo
+# Identities stay out of git: impersonators default to the active gcloud account.
+TF_VAR_impersonators ?= ["user:$(shell gcloud config get account 2>/dev/null)"]
+export TF_VAR_impersonators
+DEPLOY_SA = deploy-sa@$(shell uv run python -c "import yaml;print(yaml.safe_load(open('config/resolved.yaml'))['project_id'])").iam.gserviceaccount.com
+
+tf-bootstrap: resolve ## First apply as the owner (creates the deploy SA); later applies use tf-apply
+	terraform -chdir=$(TF_DIR) init -input=false
+	terraform -chdir=$(TF_DIR) apply -auto-approve -input=false
+
+tf-plan: ## Terraform plan impersonating the deploy SA
+	GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=$(DEPLOY_SA) terraform -chdir=$(TF_DIR) plan -input=false
+
+tf-apply: ## Terraform apply -auto-approve impersonating the deploy SA
+	GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=$(DEPLOY_SA) terraform -chdir=$(TF_DIR) apply -auto-approve -input=false
+
 tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 	@if command -v tflint > /dev/null 2>&1; then \
 		cd infra && tflint --init > /dev/null && tflint --recursive --format compact; \
@@ -53,4 +69,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help upgrade phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: help upgrade tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

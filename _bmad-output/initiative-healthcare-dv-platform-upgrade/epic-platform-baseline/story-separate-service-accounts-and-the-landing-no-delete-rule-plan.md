@@ -65,6 +65,7 @@ Bucket policy: landing has uniform bucket-level access (no ACLs), public access 
 
 - `terraform plan` (owner credentials): 14 to add, 0 change, 0 destroy -- 3 SAs, 5 deploy roles, runtime jobUser, 2 impersonation bindings, landing bucket, 2 bucket bindings.
 - `make validate` passes (tflint needed `required_version` and provider constraints in the modules).
+- The Makefile targets (tf-bootstrap/tf-plan/tf-apply) were part of the denied command and only landed later, in the 1.11 follow-up commit.
 - **Apply was not run.** The session's auto-mode safety classifier denied `make tf-bootstrap` (terraform apply creating IAM) as "Protected-Scope IaC Apply". It was not retried or worked around. Acceptance criteria 1 and 2 need the apply.
 
 ## Plan Change Log
