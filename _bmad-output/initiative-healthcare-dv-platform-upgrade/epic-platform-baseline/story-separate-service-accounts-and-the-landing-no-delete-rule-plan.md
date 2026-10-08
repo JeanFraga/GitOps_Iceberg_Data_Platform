@@ -3,7 +3,7 @@ title: 'Separate service accounts and the landing no-delete rule'
 type: 'feature'
 ticket: '6'
 created: '2026-10-07'
-status: blocked
+status: done
 baseline_revision: '9d0c0b847e7a4587f326396f4269a61676f33e80'
 route: 'full'
 route_source: 'auto'
@@ -16,8 +16,6 @@ followup_review_recommended: false
 context: []
 warnings: []
 deferred: []
-blocked_at: "2026-10-08"
-blocked_reason: "Apply done 2026-10-08 (14 added). Remaining: verify checks denied by auto-mode classifier (Credential Exploration) - user must run runtime-SA impersonated gcloud storage rm probe (expect 403) and keys list --managed-by=user for deploy/runtime/dashboard SAs"
 ---
 
 <intent-contract>
