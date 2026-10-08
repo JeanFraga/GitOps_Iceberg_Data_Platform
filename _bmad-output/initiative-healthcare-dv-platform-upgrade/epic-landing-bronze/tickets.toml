@@ -1,0 +1,153 @@
+# Stories of epic-landing-bronze (epic 3), in build order.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer: one landed sample CSV through local Spark into Bronze Iceberg, read from BigQuery"
+description = "Adds the local Spark runtime (pyspark 4.0.x and Java 21 in the devcontainer and uv project, pins in versions.yaml matching Dataproc runtime 3.0 and iceberg-spark-runtime-4.0_2.13:1.12.0, plus iceberg-gcp-bundle only if OQ 3 shows it is needed), config/standards/records.yaml (AD-4 record split per format: LF for CSV/JSONL under RFC 4180, ISA16 for X12, BOM stripped, non-UTF-8 records base64 with a flag), and an `ingestion/` package whose `make bronze PROFILE=demo FILE=gs://...` takes one landed object, refuses it unless the synthetic marker from config/standards/guardrails.yaml is present, drops the leading `# SYNTHETIC-DATA-NO-REAL-PHI` marker line of a CSV before calling config/fingerprint.py (otherwise the marker is read as the header), and appends its rows as all-STRING columns with original headers plus `_record_source`, `_source_file`, `_file_sha256`, `_line_ordinal` (1-based physical line number in the landed file, the same numbering as the datagen manifest's first affected record), `_run_id` (from pipeline/runner.py, AD-24), `_ingested_at` and `_raw_line` to `bronze_payer_b.members__<era>` in the BigLake REST catalog, partitioned by day(_ingested_at), and appends `landed` then `bronze_appended` rows to `ops.file_lifecycle`. The tracer lands datagen/samples/payer_b/members/payer_b_members_2024.csv with `gcloud storage cp --if-generation-match=0` under the datagen/upload.py path layout (source=/feed=/ingest_date=/sha256=/), and its era is a fixed name until entry 3 adds fingerprint routing. It settles OQ 2, 3 and 5 (BigLake REST on runtime 3.0 with Iceberg 1.12.0: create, append, BigQuery read) and records the answer in the ticket plan; if create, append or the BigQuery read fails on the pinned versions, the builder stops, marks the ticket blocked with the finding and changes no pin (an OQ 2/3/5 failure reshapes this epic and needs the owner)."
+verify = "With PROJECT and CAP read from config/resolved.yaml after `make resolve PROFILE=demo`: `make bronze PROFILE=demo FILE=gs://$PROJECT-landing/source=payer_b/feed=members/...` exits 0, `bq query --project_id=$PROJECT --use_legacy_sql=false --maximum_bytes_billed=$CAP` counting rows of the Bronze table through its BigQuery read path equals the data line count of the sample (marker and header lines excluded) with `_line_ordinal` starting at 3, the same query on `ops.file_lifecycle` shows `landed` and `bronze_appended` for the file's sha256, `java -version` reports 21, and `uv run pytest ingestion` passes the marker-drop and refusal unit tests."
+covers = ["CAP-3", "CAP-5"]
+after = ["1.4", "1.5", "1.6", "1.7", "1.9", "1.10", "2.10"]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "high"
+plan_checkpoint = true
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-4", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-6", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-21", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#open-questions"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Write-audit-publish with the reconcile gate and idempotent reload"
+description = "Changes entry 1's Bronze writer to AD-4 write-audit-publish: skip when `ops.file_lifecycle` already shows `bronze_appended` for the file_sha256, otherwise write to Iceberg branch `wap_<sha8>`, run the reconcile gate (record count and SHA-256 of each raw record's bytes per records.yaml against the landing object), fast-forward main only on pass with one snapshot whose summary carries `run_id` and `file_sha256`, append `reconciled`, and on failure leave main untouched, append `quarantined` and one `ops.quarantine` row with reason `RECONCILE_FAIL` (no row values in detail or logs). No update, delete or expire_snapshots is ever issued."
+verify = "`uv run pytest ingestion` passes a local-Spark test where a tampered record fails the gate (main snapshot count unchanged, quarantined row and RECONCILE_FAIL written to the fake ops backend), and on the demo project running `make bronze` twice on the tracer file leaves the Bronze row count unchanged on the second run, adds exactly one snapshot in total whose summary shows run_id and file_sha256, and `ops.file_lifecycle` ends at `reconciled` (bq query with --project_id and --maximum_bytes_billed)."
+covers = ["CAP-3"]
+after = [1]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "high"
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-9", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-10"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Era routing by fingerprint, unmapped and additive eras"
+description = "Adds the era registry config/eras/<source>.yaml (feed -> era name -> fingerprint and column list, era names ^[a-z0-9_]+$, validated by `make validate-config`) seeded with the fingerprints of the non-drifted committed samples, and makes the loader the sole era authority (kept in its own ingestion module; entry 7 keeps its reconciler in a separate module too): a known fingerprint goes to `<feed>__<era>`, an additive-only superset of a mapped era's columns goes to that era with an `ops.drift_report` row, and an unknown fingerprint goes to `<feed>__unmapped_<fp8>` with an `ops.drift_report` row, keeping Silver's `UNMAPPED_ERA` quarantine for E4."
+verify = "`uv run pytest ingestion config` passes tests that route the committed samples: payer_b_members_2024_drift_rename_column.csv and providers_drift_remove_column.csv to `unmapped_<fp8>`, payer_a_pharmacy_2024_drift_add_column.csv to the mapped era with a drift_report row, and every non-drift sample to its mapped era, and `make validate-config` rejects an era name with an uppercase letter."
+covers = ["CAP-3"]
+after = [2]
+hitl = false
+risk = "medium"
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-5", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-22"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Landing intake: discovery, duplicates, overwrite and unmarked refusal"
+description = "Adds `make land PROFILE=demo SRC=<local dir>` that lands files under the AD-3 path with `--if-generation-match=0` (an overwrite attempt is rejected and logged as a structured JSON line with no row values), and `make bronze PROFILE=demo` with no FILE that discovers landed objects from the bucket listing against `ops.file_lifecycle` (never by listing the catalog), records `landed`, marks any object whose sha256 already has a lifecycle row under another name as `rejected_duplicate`, refuses and logs an unmarked file without writing Bronze, and loads the rest through entry 2's WAP path; a re-delivered name with new content is a new object and loads."
+verify = "On the demo project, landing the same sample twice reports the overwrite rejection in the log, copying it under a second name yields `rejected_duplicate` for that object, an edited copy with the same name lands as a new object and reaches `reconciled`, tests/fixtures/marker/unmarked/members.csv is refused with a log line and no Bronze rows, and `uv run pytest ingestion` covers each case against the fake ops backend."
+covers = ["CAP-2"]
+after = [3]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-3", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-14"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Every sample format into Bronze: NDJSON and X12"
+description = "Extends the loader to the remaining formats in the committed samples: FHIR NDJSON as one JSON string column per record plus lineage columns, X12 834/835/837 split into records on ISA16 with `_line_ordinal` as the 1-based segment ordinal, the fingerprint per config/fingerprint.py's jsonl and x12 layouts, and era registry entries for every feed, so all of datagen/samples lands and reconciles."
+verify = "After `make land PROFILE=demo SRC=datagen/samples` and `make bronze PROFILE=demo`, every sample file's latest `ops.file_lifecycle` state is `reconciled`, each Bronze table's row count per file equals the records.yaml record count of that file, and `uv run pytest ingestion` passes NDJSON and X12 reconcile tests including a non-UTF-8 record stored base64 with its flag."
+covers = ["CAP-3"]
+after = [4]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "EDI pre-parse to a line-oriented derivative"
+description = "Adds `ingestion/edi/` with a pure-Python pre-parse that turns one raw X12 file into a JSONL derivative with at least one record per segment carrying the raw file name and sha256, ISA/GS/ST control numbers, segment id, segment ordinal and elements, never touching the raw file, written to gs://<project>-warehouse/edi_preparse/source=/feed=/sha256=/<name>.jsonl when run on landing, and a `make edi-preparse-check` CI target that regenerates the derivative for every X12 file in datagen/samples twice and compares bytes against committed golden copies under ingestion/edi/tests/golden/."
+verify = "`make edi-preparse-check` passes and is listed in `make validate`, a hand-edited golden file makes it fail, the derivative's segment record count equals the X12 segment count of each sample, and `make marker-check` and `make repo-weight` still pass with the goldens committed."
+covers = ["CAP-3"]
+after = [1, "1.7", "2.10"]
+hitl = false
+risk = "low"
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-4"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Storage-class reconciler for landing"
+description = "Adds `make reconcile-storage PROFILE=demo`, which lists landing objects with their storage class (`gcloud storage ls -L` or JSON output) and appends an `ops.file_lifecycle` row with the observed `storage_class` and a detail of the move whenever it differs from the last recorded class for that file_sha256, so the 7-day Coldline and 60-day Archive transitions set by E1's bucket lifecycle rules are logged; the lifecycle state itself is unchanged. Real moves are observable only 7 and 60 days after landing, so this story proves them against a fake listing and the live run records the current class."
+verify = "`uv run pytest ingestion` passes a test with a fake listing that moves one object STANDARD -> COLDLINE -> ARCHIVE and asserts exactly two class-move rows, a second identical run appends none, and on the demo project `make reconcile-storage` records STANDARD for each landed object once and nothing on rerun."
+covers = ["CAP-2"]
+after = [4]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "low"
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-10"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Dataproc Serverless runtime switch with run cap, cost ceiling and TTL"
+description = "Adds config `spark.runtime` (local default, dataproc opt-in) and a `dataproc` block (max_runs 10, per-run cost ceiling in USD, batch TTL), the Dataproc SA (or runtime SA grants) and Dataproc API in Terraform on E1's module pattern applied with `-auto-approve`, and a submit path in the runner that sends the same ingestion entry point as `gcloud dataproc batches submit pyspark --version=<versions.yaml runtime> --ttl=<ttl>` (standard tier, no Spot), refuses when `ops.run_events` already counts max_runs Dataproc runs or the estimated cost exceeds the ceiling, appends the submitted run with `dataproc_run_seq` through pipeline/runner.py (the AD-2 writer of run_events), and after each batch confirms it is terminated or deletes it (TTL guard). Scheduled Dataproc stays behind `flags.dataproc_schedule_enabled=false`."
+verify = "`uv run pytest pipeline ingestion` passes tests that the eleventh run and an over-ceiling estimate are refused before any gcloud call, and on the demo project `make bronze PROFILE=demo RUNTIME=dataproc FILE=<tracer object>` completes, `gcloud dataproc batches list --region=us-east1` shows the batch with its TTL and no running batch afterwards, and `ops.run_events` (bq query with --project_id and --maximum_bytes_billed) shows dataproc_run_seq 1."
+covers = ["CAP-5"]
+after = [5, "1.10"]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "high"
+plan_checkpoint = true
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-16", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-17", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-18", "architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-24"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Local and Dataproc parity check"
+description = "Adds `make bronze-parity PROFILE=demo`, which loads the same committed sample set into two scratch Bronze namespaces, one on local Spark and one in a single Dataproc batch, and compares per table the sorted (_file_sha256, _line_ordinal, SHA-256 of _raw_line and data columns) excluding `_run_id` and `_ingested_at`, then drops both scratch namespaces. Expected Dataproc use for the epic is 3 of the 10-run cap (entries 8, 9, 10); the builder does not retry a failed batch without checking `ops.run_events` first."
+verify = "`make bronze-parity PROFILE=demo` exits 0 reporting zero differing rows for every table, it exits nonzero on a test fixture with one altered record, and the run uses one Dataproc run of the cap as shown in `ops.run_events`."
+covers = ["CAP-5"]
+after = [8]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Opt-in full-size datagen on Dataproc"
+description = "Delivers the FR-12 runtime-switch part of the FR-1 Dataproc path parked by epic-synthetic-data (CAP-1 stays E2's): `make generate VOLUME=full RUNTIME=dataproc` packages `datagen` and submits it through entry 8's submit path (counted against the cap, refused over the cost ceiling), writing every file straight to landing with `--if-generation-match=0` semantics under the datagen/upload.py path layout, keeping datagen's pre-build estimate and budget guard, and adds the Dataproc section to datagen/README.md; output bytes equal the local full-size run for the same seed."
+verify = "On the demo project, the Dataproc run's manifest lists the same sha256 per file as `make generate VOLUME=full` locally for the same seed, every one of those sha256 exists under gs://$PROJECT-landing afterwards (landed by this run or already present), the batch is gone afterwards, `ops.run_events` counts it, and `uv run pytest datagen pipeline` passes the refusal tests."
+covers = ["CAP-5"]
+after = [8, "2.9"]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+references = ["spec-healthcare-dv-platform-upgrade/requirements-catalog.md#cap-1-synthetic-healthcare-data-generation"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "CI-volume Bronze chain, FR-35 canary scan and make e2e-chain"
+description = "Adds `make e2e-chain PROFILE=demo`, the chain later epics append to (samples -> land -> bronze -> reconcile-storage on local Spark at CI volume), which writes a run summary and structured logs to a run directory and runs `make phi-scan` over them with a canary generated SSN and full name seeded into one input record and the canary name passed to the scan through datagen/out/names.txt (which `make phi-scan` reads), so the scan proves the logs and summaries carry no row values."
+verify = "`make e2e-chain PROFILE=demo` exits 0 with every sample reconciled, the canary SSN and name are present in Bronze (bq query with --project_id and --maximum_bytes_billed) but `make phi-scan PATH=<run dir>` passes, and injecting the canary into a log line makes the scan fail."
+covers = ["CAP-2", "CAP-3", "CAP-5"]
+after = [5, 6, 7]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+references = ["spec-healthcare-dv-platform-upgrade/requirements-catalog.md#cap-14-cost-guardrails-and-phi-safety-checks"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up the epic's code, limited to the findings listed in the Deferred section of each ticket plan in epic-landing-bronze; if there are none, it closes as a no-op."
+verify = "`make validate` passes and `make e2e-chain PROFILE=demo` gives the same Bronze row counts per table as before the cleanup."
+covers = ["CAP-2", "CAP-3", "CAP-5"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+hitl = false
+risk = "low"
