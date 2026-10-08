@@ -56,7 +56,11 @@ def test_manifest_shape_and_sha(out):
     m = json.loads((out / "manifest.json").read_text())
     assert m["_synthetic"] == TOKEN and m["seed"] == 20261008 and m["volume_profile"] == "test"
     assert m["schema_drift"] == [] and m["data_drift"] == []
-    assert [f["path"] for f in m["files"]] == [
+    paths = [f["path"] for f in m["files"]]
+    e834 = [p for p in paths if p.endswith(".834")]
+    assert e834[-1] == "landing/payer_a/834/payer_a_834_full_20240101.834" and len(e834) >= 2
+    assert [p for p in paths if not p.endswith(".834")] == [
+        *(f"landing/payer_a/835/payer_a_835_{k}_{e}.835" for k in "dip" for e in ("A1", "A2")),
         *(f"landing/payer_a/837{k}/payer_a_837{k}_{e}.837" for k in "dip" for e in ("A1", "A2")),
         "landing/payer_b/members/payer_b_members_2024.csv",
         "landing/payer_b/members/payer_b_members_2025.csv",
@@ -127,7 +131,7 @@ def test_upload_copies_then_delete_and_load(out):
     upload(CFG, out, run, ingest_date="2026-10-08")
     m = json.loads((out / "manifest.json").read_text())
     cps = [c for c in run.calls if c[:3] == ["gcloud", "storage", "cp"]]
-    assert len(cps) == len(m["files"]) == 8
+    assert len(cps) == len(m["files"]) and len(m["files"]) >= 16
     pb = next(i for i, f in enumerate(m["files"]) if f["source"] == "payer_b")
     sha = m["files"][pb]["sha256"]
     assert cps[pb][3] == "--if-generation-match=0"

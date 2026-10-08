@@ -111,6 +111,22 @@ def _claim(rng, kind, claim_id, freq, original_id, person, member_id, billing, o
 
 
 def build(ctx, kind: str) -> FeedOutput:
+    return _build(ctx, kind)[0]
+
+
+def claims(ctx, kind: str) -> list[dict]:
+    """Per-claim facts of the 837 feed (cached; never re-randomised)."""
+    return _build(ctx, kind)[1]
+
+
+def _build(ctx, kind: str) -> tuple[FeedOutput, list[dict]]:
+    key = ("837", kind)
+    if key not in ctx.cache:
+        ctx.cache[key] = _generate(ctx, kind)
+    return ctx.cache[key]
+
+
+def _generate(ctx, kind: str) -> tuple[FeedOutput, list[dict]]:
     feed = f"837{kind.lower()}"
     rng = random.Random(f"{ctx.seed}:{SOURCE}:{feed}")
     n = ctx.volume["records_per_file"]
@@ -119,6 +135,7 @@ def build(ctx, kind: str) -> FeedOutput:
     others = [(generate_npi(rng), f"{i + 1:04d}") for i in range(max(3, n // 50))]
     out = FeedOutput()
     members: dict[str, str] = {}
+    facts: list[dict] = []
     for era in ERAS:
         lo, hi = era_range(era.name, ctx.years)
         span = (hi - lo).days
@@ -162,6 +179,9 @@ def build(ctx, kind: str) -> FeedOutput:
             body, latest = _claim(rng, kind, c_id, c["freq"], c["original"], c["person"], member_id,
                           c["billing"], c["other"], c["svc"], c["lines"], amt, hi)  # fmt: skip
             txs.append((latest, body))
+            facts.append({"era": era.name, "kind": kind, "claim_id": c_id, "freq": c["freq"],
+                          "original_id": c["original"], "charge": float(f"{amt:.2f}"), "member_id": member_id,
+                          "person": c["person"], "billing": c["billing"], "svc": c["svc"], "latest": latest})  # fmt: skip
             out.encounter_claim.append({"encounter_id": c["encounter_id"], "claim_source": feed, "claim_id": c_id})
         last = max(d for d, _ in txs)
         ic = x12.Interchange(era.sender, RECEIVER, _d8(last), "1200", VERSIONS[kind])
@@ -185,4 +205,4 @@ def build(ctx, kind: str) -> FeedOutput:
     out.person_truth = [
         {"source": SOURCE, "source_record_id": m, "person_truth": pid} for m, pid in sorted(members.items())
     ]
-    return out
+    return out, facts

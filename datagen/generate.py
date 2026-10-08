@@ -21,6 +21,7 @@ class Context:
     volume_name: str
     volume: dict
     token: str
+    cache: dict = field(default_factory=dict, repr=False)
     _built: dict[int, tuple[population.Household, ...]] = field(default_factory=dict, repr=False)
 
     @property

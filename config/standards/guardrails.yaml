@@ -4,7 +4,7 @@ synthetic_marker:
   # bytes (a CSV/JSONL header comment or field, an X12 BHT/REF value, a FHIR meta tag).
   token: "SYNTHETIC-DATA-NO-REAL-PHI"
   within_bytes: 4096
-  data_extensions: [".csv", ".jsonl", ".ndjson", ".x12", ".edi", ".835", ".837", ".fhir.json"]
+  data_extensions: [".csv", ".jsonl", ".ndjson", ".x12", ".edi", ".834", ".835", ".837", ".fhir.json"]
 phi_scan:
   # Regexes for PHI-shaped values that must never appear in logs, summaries, ops rows or the repo.
   patterns:

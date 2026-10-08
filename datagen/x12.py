@@ -25,6 +25,7 @@ class Interchange:
     version: str  # e.g. 005010X222A1
     control: int = 1
     functional_id: str = "HC"
+    set_id: str = "837"  # ST01
     transactions: list[list[str]] = field(default_factory=list)
 
     def add(self, body: list[str]) -> None:
@@ -42,7 +43,7 @@ class Interchange:
                              str(self.control), "X", self.version)]  # fmt: skip
         for i, body in enumerate(self.transactions, 1):
             st = f"{i:04d}"
-            segs.append(segment("ST", "837", st, self.version))
+            segs.append(segment("ST", self.set_id, st, self.version))
             segs.extend(body)
             segs.append(segment("SE", str(len(body) + 2), st))
         segs.append(segment("GE", str(len(self.transactions)), str(self.control)))
