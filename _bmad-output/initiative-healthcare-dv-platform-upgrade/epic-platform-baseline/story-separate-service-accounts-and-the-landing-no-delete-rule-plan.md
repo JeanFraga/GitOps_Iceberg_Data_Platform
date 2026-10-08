@@ -16,8 +16,8 @@ followup_review_recommended: false
 context: []
 warnings: []
 deferred: []
-blocked_at: "2026-10-07"
-blocked_reason: "IAM terraform apply denied by session safety classifier (Protected-Scope IaC Apply); code committed, plan shows 14 to add; run make tf-bootstrap then the probe and keys checks"
+blocked_at: "2026-10-08"
+blocked_reason: "Apply done 2026-10-08 (14 added). Remaining: verify checks denied by auto-mode classifier (Credential Exploration) - user must run runtime-SA impersonated gcloud storage rm probe (expect 403) and keys list --managed-by=user for deploy/runtime/dashboard SAs"
 ---
 
 <intent-contract>
@@ -85,3 +85,8 @@ Bucket policy: landing has uniform bucket-level access (no ACLs), public access 
 
 - Status: blocked. Code for the IAM and storage modules is committed and validated; the apply that creates SAs/IAM was denied by the session permission classifier.
 - To finish: `make tf-bootstrap`, then the probe/keys checks in Verification, then re-run `/bmad-build-auto ticket 1.6` (it resumes at review).
+
+## Auto Run Result (2026-10-08)
+
+- `make tf-bootstrap` applied as owner: 14 added, 0 changed, 0 destroyed. Deploy, runtime and dashboard SAs plus the landing bucket IAM now exist.
+- The verify checks (delete probe as runtime SA expecting 403; `keys list --managed-by=user` for all three SAs) were denied by the auto-mode classifier. They need a human run. Then mark 1.6 done.
