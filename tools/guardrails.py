@@ -89,7 +89,7 @@ def repo_weight(path: str | None) -> list[str]:
     """FR-37: data files outside datagen/samples/ above repo_weight.sample_records or max_bytes."""
     cfg = SPEC["repo_weight"]
     findings = []
-    for f in _files(path, [*SPEC["allowlist"], SAMPLES]):
+    for f in _files(path, [SAMPLES]):
         if not _is_data_file(f) or SAMPLES in f.resolve().as_posix() + "/":
             continue
         size = f.stat().st_size

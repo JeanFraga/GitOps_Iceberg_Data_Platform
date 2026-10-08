@@ -16,6 +16,8 @@ carries the marker `SYNTHETIC-DATA-NO-REAL-PHI` (checked by `make marker-check`)
 | `fhir.py` | FHIR R4 NDJSON (EMR Facility 1: patient, practitioner, organization, encounter) |
 | `estimate.py` | Size and storage-cost estimate plus budget headroom for full-size runs |
 | `upload.py` | Lands files in `gs://$PROJECT-landing/` and loads `mpi_eval.ground_truth` |
+| `config.py` | Reads `config/resolved.yaml`, `.env` fill rule, marker token |
+| `ndc.py`, `npi.py` | NDC forms (4-4-2, 5-3-2, 5-4-1) and Luhn-valid NPIs |
 | `generate.py` | Deterministic writer: landing files, ground truth JSONL, `manifest.json`, `names.txt` |
 
 ## Volume profiles
@@ -51,7 +53,9 @@ stops unless `FORCE=1`. Nothing is written inside the repo.
 `make samples` regenerates `datagen/samples/` deterministically from a sample-sized train run
 (`repo_weight.sample_records` = 1,000 records per file, 1 year, same seed and drift config):
 `<source>/<feed>/*`, `ground_truth/*.jsonl` and `manifest.json` (paths relative to `datagen/samples/`).
-The generated names list is never committed. Rerunning leaves the tree unchanged.
+Per-feed totals vary: 837/835 write one 1,000-claim file per era (and 835 per claim type), members and
+pharmacy split 1,000 records across base and drift slices, and FHIR patient, practitioner, organization and
+providers are derived from the sampled claims, so they hold fewer. The generated names list is never committed. Rerunning leaves the tree unchanged.
 
 `make repo-weight` (part of `make validate`) fails on any committed data file outside
 `datagen/samples/` above `repo_weight.sample_records` records or `repo_weight.max_bytes` bytes

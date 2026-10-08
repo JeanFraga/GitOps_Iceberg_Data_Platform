@@ -5,6 +5,7 @@ import random
 import subprocess
 
 import pytest
+import yaml
 
 from datagen import config, registry
 from datagen.__main__ import main
@@ -200,6 +201,11 @@ def test_samples_deterministic_one_dir_per_feed(tmp_path):
     for feed in registry.discover():
         assert any((tmp_path / "a" / feed.source / feed.feed).iterdir())
     m = json.loads((tmp_path / "a" / "manifest.json").read_text())
+    assert m["volume_profile"] == "sample"
+    assert (
+        max(f["records"] for f in m["files"])
+        == yaml.safe_load(config.GUARDRAILS.read_text())["repo_weight"]["sample_records"]
+    )
     assert m["schema_drift"] and m["data_drift"]
     for e in (*m["schema_drift"], *m["data_drift"]):
         assert (tmp_path / "a" / e["file"]).is_file()
