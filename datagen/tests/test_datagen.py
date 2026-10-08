@@ -60,6 +60,10 @@ def test_manifest_shape_and_sha(out):
     e834 = [p for p in paths if p.endswith(".834")]
     assert e834[-1] == "landing/payer_a/834/payer_a_834_full_20240101.834" and len(e834) >= 2
     assert [p for p in paths if not p.endswith(".834")] == [
+        *(
+            f"landing/emr_facility_1/{f}/emr_facility_1_{f}_F1.ndjson"
+            for f in ("encounter", "organization", "patient", "practitioner")
+        ),
         *(f"landing/payer_a/835/payer_a_835_{k}_{e}.835" for k in "dip" for e in ("A1", "A2")),
         *(f"landing/payer_a/837{k}/payer_a_837{k}_{e}.837" for k in "dip" for e in ("A1", "A2")),
         "landing/payer_a/pharmacy/payer_a_pharmacy_2024.csv",

@@ -181,7 +181,8 @@ def _generate(ctx, kind: str) -> tuple[FeedOutput, list[dict]]:
             txs.append((latest, body))
             facts.append({"era": era.name, "kind": kind, "claim_id": c_id, "freq": c["freq"],
                           "original_id": c["original"], "charge": float(f"{amt:.2f}"), "member_id": member_id,
-                          "person": c["person"], "billing": c["billing"], "svc": c["svc"], "latest": latest})  # fmt: skip
+                          "person": c["person"], "billing": c["billing"], "svc": c["svc"], "latest": latest,
+                          "encounter_id": c["encounter_id"], "other": c["other"]})  # fmt: skip
             out.encounter_claim.append({"encounter_id": c["encounter_id"], "claim_source": feed, "claim_id": c_id})
         last = max(d for d, _ in txs)
         ic = x12.Interchange(era.sender, RECEIVER, _d8(last), "1200", VERSIONS[kind])
