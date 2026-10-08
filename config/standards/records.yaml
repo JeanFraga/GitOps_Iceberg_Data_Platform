@@ -1,0 +1,17 @@
+# AD-4 record split per format. Shared by the Bronze loader (ingestion/records.py) and
+# entry 2's reconcile, so both count the same records.
+strip_bom: true            # a leading UTF-8 BOM is removed before the marker check and the split
+line_terminator: LF        # csv/jsonl records end at LF; a trailing CR is part of the terminator
+formats:
+  csv:
+    split: LF
+    quoting: rfc4180       # an LF inside a double-quoted field does not end the record
+  jsonl:
+    split: LF
+    quoting: none
+  x12:
+    split: ISA16           # segment terminator at ISA offset 105; ordinal = 1-based segment
+# A record that is not valid UTF-8 is stored base64 in _raw_line with _raw_encoding = base64.
+encoding:
+  expected: utf-8
+  fallback: base64

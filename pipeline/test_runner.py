@@ -62,3 +62,11 @@ def test_bigquery_backend_caps_bytes_and_passes_params(monkeypatch):
     assert "--parameter=now:STRING:2026-10-08T12:00:00+00:00" in merge
     assert merge[-1].startswith("MERGE `proj-1.ops.run_lock`")
     assert "ORDER BY acquired_at, run_id LIMIT 1" in select[-1]
+
+
+def test_supplied_task_receives_minted_run_id_and_lock_released():
+    backend = runner.FakeBackend()
+    seen = []
+    run_id = runner.run(backend, "demo", 120, now=T0, task=seen.append)
+    assert seen == [run_id]
+    assert "demo" not in backend.rows

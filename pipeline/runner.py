@@ -13,6 +13,7 @@ import json
 import subprocess
 import sys
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -63,15 +64,17 @@ class BigQueryBackend:
     """ops.run_lock in live BigQuery via the bq CLI (optional; `make run-stub`)."""
 
     def __init__(self, project_id: str, max_bytes_billed: int) -> None:
+        self.project_id = project_id
         self.table = f"`{project_id}.ops.run_lock`"
         self.max_bytes_billed = max_bytes_billed
 
     def _query(self, sql: str, **params: str) -> list[dict]:
-        args = ["bq", "query", "--use_legacy_sql=false", "--format=json", "--quiet"]
+        args = ["bq", f"--project_id={self.project_id}", "query", "--use_legacy_sql=false", "--format=json", "--quiet"]
         args.append(f"--maximum_bytes_billed={self.max_bytes_billed}")
         args += [f"--parameter={k}:STRING:{v}" for k, v in params.items()]
         out = subprocess.run([*args, sql], check=True, capture_output=True, text=True).stdout
-        return json.loads(out) if out.strip() else []
+        # DML prints a status line rather than JSON; only SELECTs return rows.
+        return json.loads(out) if out.lstrip().startswith("[") else []
 
     def acquire(self, lock: Lock, now: datetime) -> str:
         self._query(
@@ -109,9 +112,14 @@ def noop_task(run_id: str) -> str:
 
 
 def run(
-    backend: LockBackend, lock_key: str, ttl_minutes: int, now: datetime | None = None, release: bool = True
+    backend: LockBackend,
+    lock_key: str,
+    ttl_minutes: int,
+    now: datetime | None = None,
+    release: bool = True,
+    task: Callable[[str], object] = noop_task,
 ) -> str:
-    """Mint run_id, take the lock or raise LockHeld, run the no-op task. Returns run_id."""
+    """Mint run_id, take the lock or raise LockHeld, run `task(run_id)` (default no-op). Returns run_id."""
     now = now or datetime.now(UTC)
     run_id = mint_run_id(now)
     lock = Lock(lock_key, run_id, now, now + timedelta(minutes=ttl_minutes))
@@ -119,7 +127,7 @@ def run(
     if holder != run_id:
         raise LockHeld(f"lock held: {lock_key} by run {holder}")
     try:
-        noop_task(run_id)
+        task(run_id)
     finally:
         if release:
             backend.release(lock_key, run_id)

@@ -4,6 +4,11 @@
 # Python packages stay in pyproject.toml + uv.lock.
 dataproc_runtime: "3.0"
 iceberg_spark_runtime: "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.12.0"
+# Needed with the BigLake REST catalog: GoogleAuthManager and GCSFileIO need the Google SDK (OQ 2/3/5).
+iceberg_gcp_bundle: "org.apache.iceberg:iceberg-gcp-bundle:1.12.0"
+# Local Spark matches Dataproc runtime 3.0 (AD-17): Spark 4.0 on Java 21. pyspark is also pinned in pyproject.toml.
+spark: "4.0.4"
+java: "21"
 dbt_fusion: "2.0.6"
 # Inert: pinned for the record, not used until their flags/epics turn them on.
 composer_image:

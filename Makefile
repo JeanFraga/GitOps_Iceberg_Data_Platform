@@ -45,6 +45,19 @@ samples: resolve ## FR-37: regenerate committed datagen/samples/ (repo_weight.sa
 repo-weight: ## FR-37: fail on committed data files over the record/byte limit outside datagen/samples/. PATH=dir
 	$(GUARD) repo-weight $(SCAN_PATH)
 
+FILE ?=
+TRACER_SAMPLE := datagen/samples/payer_b/members/payer_b_members_2024.csv
+
+bronze: resolve ## Load one landed file into Bronze Iceberg (BigLake REST) and ops.file_lifecycle. FILE=gs://... required
+	@test -n "$(FILE)" || { echo "error: FILE=gs://<landing>/source=/feed=/ingest_date=/sha256=/<name> is required"; exit 1; }
+	$(UV) run python -m ingestion --profile $(PROFILE) --file $(FILE)
+
+bronze-tracer-land: resolve ## Land the committed payer_b members sample (no-op if already landed); prints its gs:// URI
+	@sha=$$(sha256sum $(TRACER_SAMPLE) | cut -d' ' -f1); \
+	uri="gs://$(PROJECT_ID)-landing/source=payer_b/feed=members/ingest_date=$$(date -u +%F)/sha256=$$sha/$$(basename $(TRACER_SAMPLE))"; \
+	existing=$$(gcloud storage ls "gs://$(PROJECT_ID)-landing/source=payer_b/feed=members/**" 2>/dev/null | grep "/sha256=$$sha/" | head -1); \
+	if [ -n "$$existing" ]; then echo "$$existing"; else gcloud storage cp --if-generation-match=0 $(TRACER_SAMPLE) "$$uri" >&2 && echo "$$uri"; fi
+
 upgrade: ## Manual platform upgrade (AD-20/FR-40): prints the platform-upgrade skill invocation
 	@echo "Platform upgrades run through the Claude Code skill .claude/skills/platform-upgrade."
 	@echo "In Claude Code, run:  /platform-upgrade"
@@ -102,4 +115,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check repo-weight tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: bronze bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

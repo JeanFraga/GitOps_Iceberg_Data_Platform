@@ -71,3 +71,12 @@ resource "google_service_account_iam_member" "runtime_impersonation" {
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = each.value
 }
+
+# Bronze loader (epic-landing-bronze entry 1): BigLake Iceberg REST catalog access, billed to
+# this project via the x-goog-user-project header (needs serviceUsageConsumer).
+resource "google_project_iam_member" "runtime_biglake" {
+  for_each = toset(["roles/biglake.editor", "roles/serviceusage.serviceUsageConsumer"])
+  project  = var.project_id
+  role     = each.value
+  member   = google_service_account.runtime.member
+}
