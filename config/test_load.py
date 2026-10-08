@@ -20,6 +20,7 @@ VALID_DEFAULTS = (
     "  dataproc_schedule_enabled: false\n  ml_fallback_enabled: true\n"
     "drift:\n  data_drift_thresholds: null\n  mode: report_only\n"
     "budget:\n  amount_usd: 5\n  alert_thresholds: [0.5, 0.9, 1.0]\n"
+    "run:\n  lock_ttl_minutes: 120\n"
 )
 VALID_PROFILE = (
     "profile: demo\nproject_id: demo-project-1\nregion: us-east1\n"

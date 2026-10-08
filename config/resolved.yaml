@@ -19,6 +19,8 @@ flags:
 profile: demo
 project_id: gitops-iceberg-data-platform
 region: us-east1
+run:
+  lock_ttl_minutes: 120
 versions:
   astronomer_cosmos:
     inert: true

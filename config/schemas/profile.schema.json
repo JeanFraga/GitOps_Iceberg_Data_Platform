@@ -13,7 +13,8 @@
     "versions",
     "drift",
     "billing_account",
-    "budget"
+    "budget",
+    "run"
   ],
   "properties": {
     "profile": {
@@ -119,6 +120,19 @@
       "additionalProperties": false,
       "properties": {
         "max_bytes_billed": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lock_ttl_minutes"
+      ],
+      "properties": {
+        "lock_ttl_minutes": {
           "type": "integer",
           "minimum": 1
         }

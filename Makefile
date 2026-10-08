@@ -42,6 +42,9 @@ lint: ## Ruff lint + format check over Python sources
 test: ## Pytest (config loader and later suites)
 	uv run pytest
 
+run-stub: resolve ## AD-24 run-identity stub against live BigQuery ops.run_lock (optional)
+	uv run python -m pipeline.runner
+
 tf-validate: ## Terraform fmt + validate (no cloud credentials needed)
 	terraform fmt -check -recursive
 	TF_DATA_DIR=.terraform-validate terraform -chdir=infra/environments/demo init -backend=false -input=false > /dev/null
@@ -83,4 +86,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

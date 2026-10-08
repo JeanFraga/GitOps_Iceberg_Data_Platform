@@ -13,3 +13,6 @@ drift:
 budget:
   amount_usd: 5
   alert_thresholds: [0.5, 0.9, 1.0]
+# AD-17: one pipeline run per client; ops.run_lock expires after this TTL.
+run:
+  lock_ttl_minutes: 120
