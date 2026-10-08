@@ -1,0 +1,18 @@
+# Era registry for provider_directory (AD-5): feed -> era -> {fingerprint, columns}.
+# Fingerprints and columns come from config/fingerprint.py (AD-22); seeded from the
+# non-drift committed samples. Validated by `make validate-config`.
+providers:
+  era_2024:
+    fingerprint: 966d5b14993619e1dab86d3c26e36692e2051344e56bbadab87459dbfcac27af
+    columns:
+    - npi
+    - entity_type_code
+    - first_name
+    - last_name
+    - credential
+    - organization_name
+    - taxonomy_code
+    - address_line1
+    - city
+    - state
+    - zip

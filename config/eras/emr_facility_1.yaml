@@ -1,0 +1,47 @@
+# Era registry for emr_facility_1 (AD-5): feed -> era -> {fingerprint, columns}.
+# Fingerprints and columns come from config/fingerprint.py (AD-22); seeded from the
+# non-drift committed samples. Validated by `make validate-config`.
+encounter:
+  f1:
+    fingerprint: d64a8bd05d31f4be84c441c824413bc48f9de757e7847cb74dbc3b0a8ad4de1f
+    columns:
+    - class
+    - id
+    - identifier
+    - meta
+    - participant
+    - period
+    - resourceType
+    - serviceProvider
+    - status
+    - subject
+organization:
+  f1:
+    fingerprint: 368d9c3745a1be5ebaf5f6ef1d05c61f359cf9b04ac2796be586ca55302f8f60
+    columns:
+    - id
+    - identifier
+    - meta
+    - name
+    - resourceType
+patient:
+  f1:
+    fingerprint: 3e4876698152aefe0b23af6d2a1a58198cf008a3c8f237239e61a9b05c55cc2a
+    columns:
+    - address
+    - birthDate
+    - gender
+    - id
+    - identifier
+    - meta
+    - name
+    - resourceType
+practitioner:
+  f1:
+    fingerprint: 368d9c3745a1be5ebaf5f6ef1d05c61f359cf9b04ac2796be586ca55302f8f60
+    columns:
+    - id
+    - identifier
+    - meta
+    - name
+    - resourceType

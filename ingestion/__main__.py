@@ -1,7 +1,9 @@
 """Tracer Bronze load: python -m ingestion --profile demo --file gs://.../payer_b_members_2024.csv
 
 Refuses an unmarked object (NFR-4), drops the CSV marker line, appends all-STRING rows plus
-lineage to bronze_<source>.<feed>__<era> through AD-4 write-audit-publish: skip a file already
+lineage to bronze_<source>.<feed>__<era> through AD-4 write-audit-publish. The era comes from the
+AD-5 registry by fingerprint (ingestion/eras.py): known, additive (schema widened) or unmapped_<fp8>;
+additive and unmapped routings write one ops.drift_report row after `reconciled`. Steps: skip a file already
 appended, record `landed` once, write branch wap_<sha8> (`bronze_appended`), run the reconcile
 gate, then fast-forward main (`reconciled`) or quarantine (`quarantined` + ops.quarantine
 RECONCILE_FAIL), and prove a BigQuery read. Logs are JSON lines on
@@ -21,15 +23,14 @@ from pathlib import Path
 
 import yaml
 
-from config.fingerprint import fingerprint, fp8
-from ingestion import bronze, lifecycle, reconcile
+from config.fingerprint import csv_layout, fingerprint, fp8
+from ingestion import bronze, drift, eras, lifecycle, reconcile
 from ingestion.marker import UnmarkedFile, check_marker, drop_marker_line
 from ingestion.records import split
 from pipeline import runner
 
 RESOLVED = Path(__file__).resolve().parent.parent / "config" / "resolved.yaml"
 URI_RE = re.compile(r"^gs://[^/]+/source=(?P<source>[^/]+)/feed=(?P<feed>[^/]+)/.*?sha256=(?P<sha>[0-9a-f]{64})/[^/]+$")
-FIXED_ERA = "era_2024"  # tracer: fingerprint routing is entry 3
 
 
 def log(event: str, **fields) -> None:
@@ -52,6 +53,24 @@ def bq_count(project_id: str, cap: int, table_ref: str, run_id: str) -> dict:
     }
 
 
+def report_drift(project: str, cap: int, run_id: str, source: str, feed: str, route: eras.Route, detail: dict,
+                 sha: str) -> None:  # fmt: skip
+    """One ops.drift_report row for an additive or unmapped routing; written only after `reconciled`."""
+    if route.kind == eras.KNOWN:
+        return
+    kind = drift.KINDS[route.kind]
+    info = {"file_sha256": sha, "fingerprint": detail["fingerprint"], "fp8": detail["fp8"], "table": detail["table"]}
+    if route.added:
+        info["added_columns"] = route.added
+    drift.record(project_id=project, max_bytes_billed=cap, run_id=run_id, source=source, feed=feed,
+                 schema_era=route.era, drift_kind=kind, detail=info)  # fmt: skip
+    log("drift_reported", run_id=run_id, drift_kind=kind, schema_era=route.era, **info)
+
+
+class UnsupportedFormat(Exception):
+    """The landed object is not CSV; X12 and JSONL loading is a later entry."""
+
+
 class ReconcileFail(Exception):
     """The WAP branch does not match the landed object; main was left untouched."""
 
@@ -63,9 +82,10 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
     if table_suffix and not re.fullmatch(r"_[a-z0-9_]+", table_suffix):
         raise ValueError("table suffix must match _[a-z0-9_]+")
     source, feed, path_sha = m["source"], m["feed"], m["sha"]
+    if not uri.lower().endswith(".csv"):
+        log("refused_unsupported_format", object_uri=uri, run_id=run_id)
+        raise UnsupportedFormat("only CSV deliveries are loaded until X12/JSONL routing lands")
     project, cap = cfg["project_id"], cfg["cost"]["max_bytes_billed"]
-    namespace, table = f"bronze_{source}", f"{feed}__{FIXED_ERA}{table_suffix}"
-    qualified = f"{namespace}.{table}"
 
     data = _gcloud(["cat", uri])
     sha = hashlib.sha256(data).hexdigest()
@@ -77,13 +97,25 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
         log("refused_unmarked", object_uri=uri, file_sha256=sha, run_id=run_id)
         raise
 
+    # AD-5: route on the fingerprint of the header (marker line dropped), never on dates or names.
+    records = drop_marker_line(split(data, "csv"))
+    text = "\n".join(r.raw.decode("utf-8", errors="replace") for r in records[:1])
+    fp = fingerprint(text, "csv")
+    route = eras.resolve(source, feed, fp, csv_layout(text))
+    namespace, table = f"bronze_{source}", f"{feed}__{route.era}{table_suffix}"
+    qualified = f"{namespace}.{table}"
+
     # Idempotent reload: skip a file whose append to this table finished -- reconciled or
     # quarantined (replay is E4's job), or a pre-WAP (3.1) append with no branch. A WAP attempt
     # that died between bronze_appended and the gate outcome is retried on a replaced branch.
     seen = lifecycle.latest_states(project_id=project, max_bytes_billed=cap, file_sha256=sha)
+    # Checked across every era table of this feed (same demo suffix): after an AD-5 registry
+    # rebind the file routes to a new era, but it must not be appended a second time.
     mine = [s for s in seen if s["table"] == qualified]
-    if any(s["state"] in ("reconciled", "quarantined") for s in mine) or any(
-        s["state"] == "bronze_appended" and not s.get("branch") for s in mine
+    done = [s for s in seen if (s["table"] or "").startswith(f"{namespace}.{feed}__")
+            and (s["table"] or "").endswith(table_suffix)]  # fmt: skip
+    if any(s["state"] in ("reconciled", "quarantined") for s in done) or any(
+        s["state"] == "bronze_appended" and not s.get("branch") for s in done
     ):
         log("skipped_already_appended", object_uri=uri, file_sha256=sha, run_id=run_id, table=qualified)
         return {"run_id": run_id, "skipped": "already_appended", "table": qualified}
@@ -95,14 +127,11 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
         lifecycle.record(**common, state="landed", detail={"bytes": len(data)})
         log("landed", object_uri=uri, file_sha256=sha, run_id=run_id)
 
-    records = drop_marker_line(split(data, "csv"))
-    text = "\n".join(r.raw.decode("utf-8", errors="replace") for r in records[:1])
-    fp = fingerprint(text, "csv")
     columns, rows = bronze.build_rows(
         records, ingested_at=datetime.now(UTC), source_file=uri, record_source=f"{source}.{feed}", sha256=sha,
         run_id=run_id,
     )  # fmt: skip
-    detail = {"rows": len(rows), "era": FIXED_ERA, "fingerprint": fp, "fp8": fp8(fp), "table": qualified,
+    detail = {"rows": len(rows), "era": route.era, "era_kind": route.kind, "fingerprint": fp, "fp8": fp8(fp), "table": qualified,
               "ragged_rows": bronze.ragged_count(records)}  # fmt: skip
     table_ref = f"{project}.{project}-warehouse.{namespace}.{table}"
 
@@ -115,6 +144,7 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
             detail.update(snapshot_id=published, recovered="published_without_reconciled")
             lifecycle.record(**common, state="reconciled", detail=detail)
             log("reconciled", object_uri=uri, file_sha256=sha, run_id=run_id, **detail)
+            report_drift(project, cap, run_id, source, feed, route, detail, sha)
             return {"run_id": run_id, **detail, "skipped": "already_published"}
         ident, branch = bronze.write_branch(spark, namespace, table, columns, rows, run_id, sha)
         detail["branch"] = branch
@@ -146,6 +176,7 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
     lifecycle.record(**common, state="reconciled", detail={**detail, "expected": result.expected,
                                                            "actual": result.actual})  # fmt: skip
     log("reconciled", object_uri=uri, file_sha256=sha, run_id=run_id, **detail)
+    report_drift(project, cap, run_id, source, feed, route, detail, sha)
 
     read = bq_count(project, cap, table_ref, run_id)
     log("bigquery_read", table_ref=table_ref, run_id=run_id, **read)
@@ -172,6 +203,9 @@ def main(argv: list[str] | None = None) -> int:
     except UnmarkedFile:
         log("error", error_type="UnmarkedFile", error="no synthetic marker; file refused")
         return 3
+    except UnsupportedFormat:
+        log("error", error_type="UnsupportedFormat", error="not a CSV delivery; file refused")
+        return 5
     except ReconcileFail:
         log("error", error_type="ReconcileFail", error="reconcile gate failed; file quarantined, main untouched")
         return 4

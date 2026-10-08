@@ -72,7 +72,11 @@ class FakeOps:
         return [s["state"] for s in self.lifecycle]
 
 
-def marked(body=b"member_id,first_name\nM1,Zoe\nM2,Ann\n"):
+MEMBERS_HEADER = (b"member_id,subscriber_id,person_code,household_id,first_name,last_name,dob,sex,address_line1,"
+                  b"city,state,zip,pcp_npi,coverage_start,coverage_end,ssn")  # fmt: skip
+
+
+def marked(body=MEMBERS_HEADER + b"\nM1\nM2\n"):
     data = b"# SYNTHETIC-DATA-NO-REAL-PHI\n" + body
     sha = hashlib.sha256(data).hexdigest()
     return data, sha, f"gs://b/source=payer_b/feed=members/ingest_date=2026-10-08/sha256={sha}/x.csv"

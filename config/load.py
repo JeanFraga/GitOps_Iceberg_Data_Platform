@@ -82,7 +82,7 @@ def check_defaults(config_dir: Path = CONFIG_DIR) -> None:
 
 
 def validate_standards(config_dir: Path = CONFIG_DIR) -> None:
-    """lifecycle.yaml matches its schema and its transitions form a closed graph over the states."""
+    """lifecycle.yaml matches its schema and its transitions form a closed graph; era registries are valid."""
     lifecycle = _read(config_dir / "standards" / "lifecycle.yaml")
     schema = json.loads((config_dir / "schemas" / "lifecycle.schema.json").read_text())
     errors = [e.message for e in Draft202012Validator(schema).iter_errors(lifecycle)]
@@ -90,6 +90,36 @@ def validate_standards(config_dir: Path = CONFIG_DIR) -> None:
         errors.append("transitions must list every state exactly once")
     if errors:
         raise ConfigError("lifecycle.yaml violations:\n  " + "\n  ".join(errors))
+    validate_eras(config_dir)
+
+
+def validate_eras(config_dir: Path = CONFIG_DIR) -> None:
+    """Every config/eras/<source>.yaml matches eras.schema.json; no fingerprint repeats within a feed (AD-5)."""
+    schema = json.loads((config_dir / "schemas" / "eras.schema.json").read_text())
+    errors: list[str] = []
+    for path in sorted((config_dir / "eras").glob("*.yaml")):
+        registry = yaml.safe_load(path.read_text())
+        name = f"eras/{path.name}"
+        found = list(Draft202012Validator(schema).iter_errors(registry))
+        errors += [f"{name}: {'.'.join(map(str, e.path)) or '<root>'}: {e.message}" for e in found]
+        if found:
+            continue
+        for feed, eras in registry.items():
+            seen: dict[str, str] = {}
+            owner: dict[str, str] = {}
+            for era, entry in eras.items():
+                for alias in entry.get("aliases", []):
+                    if alias in eras or alias in owner:
+                        errors.append(f"{name}: {feed}.{era}: alias {alias} collides with an era or another alias")
+                    owner.setdefault(alias, era)
+            for era, entry in eras.items():
+                if entry["fingerprint"] in seen:
+                    errors.append(
+                        f"{name}: {feed}.{era}: fingerprint already mapped to era {seen[entry['fingerprint']]}"
+                    )
+                seen.setdefault(entry["fingerprint"], era)
+    if errors:
+        raise ConfigError("era registry violations:\n  " + "\n  ".join(errors))
 
 
 def check_bytes_cap(profile: str, config_dir: Path = CONFIG_DIR) -> None:

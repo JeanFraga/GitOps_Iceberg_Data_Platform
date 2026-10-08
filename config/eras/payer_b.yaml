@@ -1,0 +1,23 @@
+# Era registry for payer_b (AD-5): feed -> era -> {fingerprint, columns}.
+# Fingerprints and columns come from config/fingerprint.py (AD-22); seeded from the
+# non-drift committed samples. Validated by `make validate-config`.
+members:
+  era_2024:
+    fingerprint: 2f7434daef2fa6e1b0e059b2a592336ac3c12c5c2888114c282818ac88ba99d0
+    columns:
+    - member_id
+    - subscriber_id
+    - person_code
+    - household_id
+    - first_name
+    - last_name
+    - dob
+    - sex
+    - address_line1
+    - city
+    - state
+    - zip
+    - pcp_npi
+    - coverage_start
+    - coverage_end
+    - ssn

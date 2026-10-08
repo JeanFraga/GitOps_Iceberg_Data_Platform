@@ -1,0 +1,147 @@
+# Era registry for payer_a (AD-5): feed -> era -> {fingerprint, columns}.
+# Fingerprints and columns come from config/fingerprint.py (AD-22); seeded from the
+# non-drift committed samples. Validated by `make validate-config`.
+'834':
+  era_2024:
+    fingerprint: dab595ea90bc5557e063084f0c5c499d397a5aea8910b32cded64a1b5d2e1e86
+    columns:
+    - ST
+    - BGN
+    - N1
+    - INS
+    - REF
+    - NM1
+    - N3
+    - N4
+    - DMG
+    - HD
+    - DTP
+    - SE
+  era_2024_v2:
+    fingerprint: ef19279acc6a7b2e9e8263bfb7c5f02fa1856afc71b73691d21e1dad1eaf3be0
+    columns:
+    - ST
+    - BGN
+    - N1
+    - INS
+    - REF
+    - NM1
+    - N3
+    - N4
+    - DMG
+    - DTP
+    - HD
+    - SE
+'835':
+  a1:
+    fingerprint: e5d3b65a559ea6395e646da0a359b2364f5e44cd140404c28d6698292a010097
+    columns:
+    - ST
+    - BPR
+    - TRN
+    - REF
+    - DTM
+    - N1
+    - N3
+    - N4
+    - LX
+    - CLP
+    - CAS
+    - NM1
+    - AMT
+    - SE
+    aliases:
+    - a2
+837d:
+  a1:
+    fingerprint: c62f28e51d3f8992e44fecf1c3bd371d0f9b681f216f862fce8554f65066fb08
+    columns:
+    - ST
+    - BHT
+    - NM1
+    - PER
+    - HL
+    - N3
+    - N4
+    - REF
+    - SBR
+    - DMG
+    - CLM
+    - LX
+    - SV3
+    - TOO
+    - DTP
+    - SE
+    aliases:
+    - a2
+837i:
+  a1:
+    fingerprint: 68ad09ec442ec7f6dae81b6dc2fa0288290349dfae4f8a87d99520b9755d7f84
+    columns:
+    - ST
+    - BHT
+    - NM1
+    - PER
+    - HL
+    - N3
+    - N4
+    - REF
+    - SBR
+    - DMG
+    - CLM
+    - DTP
+    - CL1
+    - HI
+    - LX
+    - SV2
+    - SE
+    aliases:
+    - a2
+837p:
+  a1:
+    fingerprint: 3c5132badb45bb14fbd2f2c4287d32e720342bc64715d335caaeffd33d86ee32
+    columns:
+    - ST
+    - BHT
+    - NM1
+    - PER
+    - HL
+    - N3
+    - N4
+    - REF
+    - SBR
+    - DMG
+    - CLM
+    - HI
+    - LX
+    - SV1
+    - DTP
+    - SE
+    aliases:
+    - a2
+pharmacy:
+  era_2024:
+    fingerprint: 9217c025092ddb40444ec55d04fd84e622053144ccc7a32e459cecff1203417a
+    columns:
+    - payer_id
+    - rx_number
+    - fill_number
+    - service_provider_id_qualifier
+    - service_provider_id
+    - ncpdp_id
+    - prescriber_id
+    - cardholder_id
+    - patient_first_name
+    - patient_last_name
+    - patient_dob
+    - patient_gender_code
+    - date_of_service
+    - product_service_id
+    - product_name
+    - quantity_dispensed
+    - days_supply
+    - ingredient_cost_paid
+    - dispensing_fee_paid
+    - patient_pay_amount
+    - total_amount_paid
+    - transaction_response_status

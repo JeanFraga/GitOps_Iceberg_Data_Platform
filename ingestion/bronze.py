@@ -114,11 +114,16 @@ def wap_branch(sha256: str) -> str:
 
 
 def ensure_table(spark, namespace: str, table: str, columns: list[str]) -> str:
-    """Create namespace/table if absent (partitioned by days(_ingested_at)). Returns the identifier."""
+    """Create namespace/table if absent (partitioned by days(_ingested_at)) and add new columns. Returns the identifier."""
     spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{namespace}")
     ident = f"{CATALOG}.{namespace}.{table}"
     ddl = ", ".join([f"`{c}` string" for c in columns] + [f"`{n}` {t}" for n, t in LINEAGE])
     spark.sql(f"CREATE TABLE IF NOT EXISTS {ident} ({ddl}) USING iceberg PARTITIONED BY (days(_ingested_at))")
+    # AD-5 additive era: new data columns are appended to the schema (nullable STRING); none are dropped.
+    existing = set(spark.table(ident).columns)
+    added = [c for c in columns if c not in existing]
+    if added:
+        spark.sql(f"ALTER TABLE {ident} ADD COLUMNS ({', '.join(f'`{c}` string' for c in added)})")
     return ident
 
 
@@ -151,6 +156,11 @@ def write_branch(
     else:
         spark.sql(f"ALTER TABLE {ident} CREATE OR REPLACE BRANCH `{branch}`")
     df = spark.createDataFrame(rows, schema)
+    # Table columns this file lacks (an earlier additive era widened the table) are written as NULL.
+    from pyspark.sql.functions import col, lit
+
+    df = df.select(*[col(f"`{c}`") if c in df.columns else lit(None).cast("string").alias(c)
+                     for c in spark.table(ident).columns])  # fmt: skip
     (df.writeTo(f"{ident}.branch_{branch}")
        .option("snapshot-property.run_id", run_id)
        .option("snapshot-property.file_sha256", sha256)
