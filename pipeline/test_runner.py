@@ -43,3 +43,22 @@ def test_main_exits_nonzero_when_lock_held(monkeypatch, capsys):
     monkeypatch.setattr(runner, "BigQueryBackend", lambda project_id, max_bytes_billed: backend)
     assert runner.main([]) == 1
     assert "lock held" in capsys.readouterr().err
+
+
+def test_bigquery_backend_caps_bytes_and_passes_params(monkeypatch):
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        out = '[{"run_id": "r1"}]' if args[-1].startswith("SELECT") else ""
+        return type("P", (), {"stdout": out})()
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    backend = runner.BigQueryBackend("proj-1", 1000)
+    lock = runner.Lock("demo", "r1", T0, T0 + timedelta(minutes=120))
+    assert backend.acquire(lock, T0) == "r1"
+    merge, select = calls
+    assert all("--maximum_bytes_billed=1000" in c for c in calls)
+    assert "--parameter=now:STRING:2026-10-08T12:00:00+00:00" in merge
+    assert merge[-1].startswith("MERGE `proj-1.ops.run_lock`")
+    assert "ORDER BY acquired_at, run_id LIMIT 1" in select[-1]
