@@ -22,9 +22,17 @@ def _sha_landed(run: Runner, prefix: str, sha: str) -> bool:
     return res.returncode == 0 and f"/sha256={sha}/" in res.stdout
 
 
-def upload_landing(manifest: dict, out: Path, bucket: str, ingest_date: str, run: Runner) -> list[str]:
+def upload_landing(
+    manifest: dict, out: Path, bucket: str, ingest_date: str, run: Runner, totals: dict | None = None
+) -> list[str]:
+    """Land each file once; `totals` (if given) accumulates file count and local bytes landed or present."""
     log = []
+    totals = {} if totals is None else totals
+    totals.setdefault("files", 0)
+    totals.setdefault("bytes", 0)
     for f in manifest["files"]:
+        totals["files"] += 1
+        totals["bytes"] += (out / f["path"]).stat().st_size
         prefix = f"gs://{bucket}/source={f['source']}/feed={f['feed']}/"
         name = Path(f["path"]).name
         target = f"{prefix}ingest_date={ingest_date}/sha256={f['sha256']}/{name}"
@@ -72,7 +80,9 @@ def upload(cfg: dict, out: Path = OUT, run: Runner = subprocess.run, ingest_date
     manifest = json.loads(manifest_path.read_text())
     ingest_date = ingest_date or datetime.now(UTC).date().isoformat()
     project = cfg["project_id"]
-    log = upload_landing(manifest, out, f"{project}-landing", ingest_date, run)
+    totals: dict = {}
+    log = upload_landing(manifest, out, f"{project}-landing", ingest_date, run, totals)
     n = load_ground_truth(manifest, out, project, cfg["cost"]["max_bytes_billed"], run)
     log.append(f"ground_truth: {n} row(s) for generator_seed {manifest['seed']}")
+    log.append(f"summary: {totals['files']} file(s), {totals['bytes']} bytes landed or already present")
     return log

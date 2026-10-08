@@ -33,8 +33,8 @@ marker-check: ## AD-14: fail on data files without the synthetic marker. PATH=di
 UV = $(if $(SCAN_PATH),/usr/bin/env PATH="$(TOOL_PATH)") uv
 VOLUME ?=
 
-generate: resolve ## Seeded synthetic data into datagen/out/ (VOLUME=ci|full, default datagen.volume_profile; EVAL=1 held-out eval seed)
-	$(UV) run python -m datagen generate $(if $(VOLUME),--volume $(VOLUME)) $(if $(EVAL),--eval)
+generate: resolve ## Seeded synthetic data (VOLUME=ci -> datagen/out/; VOLUME=full -> estimate, budget guard, land in gs://$PROJECT-landing/, FORCE=1 overrides guard; EVAL=1 held-out eval seed)
+	$(UV) run python -m datagen generate $(if $(VOLUME),--volume $(VOLUME)) $(if $(EVAL),--eval) $(if $(FORCE),--force)
 
 generate-upload: resolve ## Land datagen/out/ files in the landing bucket and load mpi_eval.ground_truth
 	$(UV) run python -m datagen upload
