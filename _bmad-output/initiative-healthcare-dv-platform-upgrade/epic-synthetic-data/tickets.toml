@@ -1,0 +1,125 @@
+# Stories of epic-synthetic-data (epic 2), in build order.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Tracer: one seeded feed from make generate to landing and ground truth"
+description = "Creates the `datagen/` package with a pluggable feed registry (one module per feed, discovered without editing the others), adds `datagen.seed`, `datagen.eval_seed` and `datagen.volume_profile` (named profiles `ci` and `full`, records per file and years of files) to config/defaults.yaml and the JSON Schema read by config/load.py, and implements one feed end to end: Payer B flat member CSV of persons and members with households, written with sorted content, the synthetic marker token from config/standards/guardrails.yaml in its header, a JSON manifest (seed, volume_profile, files with SHA-256, empty drift lists) and a ground-truth contract fixed here for later entries: datagen/out/ground_truth/person_truth.jsonl (generator_seed, source, source_record_id, person_truth, matching the existing mpi_eval.ground_truth schema) plus named side tables coverage_spans.jsonl and encounter_claim.jsonl that later entries fill; the manifest and ground-truth files are JSON/JSONL and carry the marker as a leading `_synthetic` field. Also adds the shared NPI generator (reserved synthetic range, prefix 80840, Luhn check digit) used by entries 2, 4 and 5. `make generate PROFILE=demo VOLUME=ci` writes to datagen/out/ (gitignored); `make generate-upload` uploads each file to gs://<project>-landing/ under a path that includes its SHA-256 with `gcloud storage cp --if-generation-match=0` and loads ground truth into `mpi_eval.ground_truth` with `bq load` using the cost.max_bytes_billed cap. Generated full names are written to datagen/out/names.txt and passed to phi-scan via --names when scanning logs and run summaries (not data files)."
+verify = "With PROJECT=$(uv run python -c \"import yaml;print(yaml.safe_load(open('config/resolved.yaml'))['project_id'])\") and CAP from cost.max_bytes_billed in the same file after `make resolve PROFILE=demo`: `make generate PROFILE=demo VOLUME=ci` run twice gives identical `sha256sum datagen/out/**` output, `make marker-check PATH=datagen/out` passes, `uv run pytest datagen` passes (determinism, marker, manifest shape, every member in ground truth, NPI Luhn), and after `make generate-upload` `gcloud storage ls gs://$PROJECT-landing/` lists the file and `bq query --use_legacy_sql=false --maximum_bytes_billed=$CAP 'select count(*) from mpi_eval.ground_truth'` equals the member count."
+covers = ["CAP-1"]
+after = ["1.3", "1.6", "1.7", "1.8", "1.9"]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+references = ["architecture-healthcare-dv-platform-upgrade/architecture-healthcare-dv-platform-upgrade.md#ad-25", "spec-healthcare-dv-platform-upgrade/requirements-catalog.md#cap-1-synthetic-healthcare-data-generation"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "X12 837P/I/D claims with Payer A eras and claim versions"
+description = "Adds a minimal X12 005010 writer (ISA/GS/ST envelopes, ISA16 segment terminator, synthetic marker in a BHT or REF value within the first 4096 bytes) and the Payer A claims feeds 837P (X222A1), 837I (X223A2, with its own nullable sections) and 837D (X224A2), not certified, with two claims eras whose boundary falls inside the 2-year window, claim frequency/version codes 1, 7 and 8, 837I institutional fields (type of bill, admit/discharge dates, revenue codes, DRG), rendering/billing NPIs from entry 1's generator, ICD-10 and HCPCS codes, and CPT/CDT values that are code-shaped only with no descriptors. Each file is listed in the manifest with its era."
+verify = "`uv run pytest datagen` passes tests that parse every generated 837 file back into segments, assert ISA/IEA and SE segment counts match, every NPI passes Luhn with prefix 80840, claim versions 1, 7 and 8 all appear, both Payer A eras appear in one CI run, every 837I carries type of bill, admit/discharge dates, revenue codes and DRG, and two runs give identical SHA-256; `make marker-check PATH=datagen/out` passes."
+covers = ["CAP-1"]
+after = [1]
+hitl = false
+risk = "high"
+
+[[entry]]
+id = 3
+type = "story"
+title = "X12 834 enrollment and 835 remittance"
+description = "Adds the Payer A 834 (X220A1) enrollment feed with INS03 codes 021, 024 and 001, full and change files, and plan switching with coverage gaps, writing each true coverage span to ground_truth/coverage_spans.jsonl so 834 transactions can be checked against it, and the 835 (X221A1) remittance feed adjudicating the claims from entry 2 with allowed, paid and patient-responsibility (CAS PR) amounts and claim status, both through entry 2's X12 writer."
+verify = "`uv run pytest datagen` passes tests that parse every 834 and 835 file, assert INS03 021, 024 and 001 all occur, at least one full and one change 834 file exist, at least one member switches plans with a gap, every 835 CLP references a generated claim and carries allowed, paid and CAS PR amounts, coverage_spans.jsonl matches the spans implied by the 834 files, and two runs give identical SHA-256."
+covers = ["CAP-1"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 4
+type = "story"
+title = "Pharmacy NCPDP-style CSV and providers"
+description = "Adds the NCPDP-style pharmacy claims CSV feed with NDCs in all three 10-digit forms (4-4-2, 5-3-2, 5-4-1) plus a helper that normalizes each to 11 digits, and a provider feed (practitioners and facilities, NPIs from entry 1's Luhn generator), each its own feed module with marker and manifest entries."
+verify = "`uv run pytest datagen` passes tests asserting each NDC form appears in a CI run, normalization to 11 digits is correct for each form, every provider NPI passes Luhn, and two runs give identical SHA-256."
+covers = ["CAP-1"]
+after = [1]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 5
+type = "story"
+title = "EMR Facility 1 FHIR NDJSON"
+description = "Adds the EMR Facility 1 FHIR R4 NDJSON feeds (Patient, Practitioner, Organization, Encounter) with at least one era, where Encounters reference Patient, Practitioner and Organization and carry no claim id, the synthetic marker in each resource's meta.tag, and the encounter-to-claim link written only to ground_truth/encounter_claim.jsonl (patients map to true persons like members do)."
+verify = "`uv run pytest datagen` passes tests asserting every Encounter reference resolves to a generated Patient, Practitioner and Organization, no Encounter field contains a claim id, every patient appears in ground truth with a person, the encounter-claim link exists only in ground truth, and two runs give identical SHA-256."
+covers = ["CAP-1"]
+after = [2]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 6
+type = "story"
+title = "Identity noise plugins, edge-case rate and held-out eval seed"
+description = "Adds pluggable identity-noise scenarios covering the full FR-4 list (typos, nicknames, swapped names and name-order swaps, hyphenated or compound surnames, DOB day/month swap, twins, moves, SSN missing, last-4 or default, surname changes, newborn placeholders, Jr/Sr, shared households, cross-payer switching) applied across member and patient records, a configurable `datagen.edge_case_rate` (default 0.02), and a `datagen.eval_only_scenarios` list so the evaluation seed run includes at least one scenario the training seed run lacks; ground truth records the seed per row (`generator_seed`)."
+verify = "`uv run pytest datagen` passes tests asserting every member and patient record maps to one true person, the measured share of true-match pairs with an edge-case noise type is within 0.015-0.025 at CI volume for both seeds, the eval-seed manifest lists a noise scenario absent from the training-seed manifest, and two runs give identical SHA-256."
+covers = ["CAP-1"]
+after = [3, 4, 5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 7
+type = "story"
+title = "Schema drift injection with manifest entries"
+description = "Adds five pluggable schema-drift scenarios (rename, add column mid-era, remove column, date format change, cast failure) applied by default to configured feeds, each recorded in the manifest's `schema_drift` list with scenario, source, file and first affected record (line ordinal), so a drifted file has a different header/segment layout fingerprint per AD-5."
+verify = "`uv run pytest datagen` passes tests asserting all 5 scenarios are in the default CI-run manifest, each manifest entry's file and first affected record actually shows the drift, config/fingerprint.py gives the drifted rename/add/remove files a fingerprint different from their era's, and two runs give identical SHA-256."
+covers = ["CAP-1"]
+after = [3, 4, 5]
+hitl = false
+risk = "medium"
+
+[[entry]]
+id = 8
+type = "story"
+title = "Data drift samples in the manifest"
+description = "Adds pluggable data-drift scenarios (code-mix shift, null-rate shift, unit/scale shift, amount-distribution shift) applied in the default run and recorded in the manifest's `data_drift` list with scenario, source, file and first affected record; profiling and flagging stay in epic-silver-normalization."
+verify = "`uv run pytest datagen` passes tests asserting all 4 data-drift scenarios appear in the default CI-run manifest and the affected files' measured statistic (null share, code distribution, scale, amount mean) differs from the previous file of the same source and era by more than the scenario's declared magnitude, and two runs give identical SHA-256."
+covers = ["CAP-1"]
+after = [3, 4, 5]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 9
+type = "story"
+title = "Full-size local run to landing and CI volume profile"
+description = "Makes `make generate VOLUME=full` produce the default 30,000 records per file over 2 years for every feed, streaming each finished file straight to the landing bucket with `--if-generation-match=0` (no full-size file kept in the repo tree), and `VOLUME=ci` about 5k members; `.env` may override volume locally but config wins on conflict; size changes need no code change. Prints a pre-build size and storage-cost estimate first and refuses the upload when the estimate exceeds the remaining NFR-1 budget headroom (config budget.amount_usd) unless FORCE=1."
+verify = "`make generate VOLUME=full` on the demo profile completes from the CLI and `gcloud storage du -s gs://$PROJECT-landing/` (PROJECT from config/resolved.yaml) matches the run summary's total bytes, rerunning reports every object already present without overwriting it, `make generate VOLUME=ci` yields about 5,000 members, and `git status --porcelain` shows no generated file."
+covers = ["CAP-1"]
+after = [6, 7, 8]
+hitl = false
+notes = ["Use cli commands that can auto approve"]
+risk = "medium"
+
+[[entry]]
+id = 10
+type = "story"
+title = "Committed 1,000-record samples, README and repo-weight guard"
+description = "Adds `make samples` that regenerates exactly one 1,000-record sample per feed into datagen/samples/ (at least one showing schema drift and one data drift, with their manifest and ground truth), datagen/README.md covering the modules, volume_profile, local and full-size runs and sample regeneration (stating synthetic data, no real PHI), and a `repo-weight` check in tools/guardrails.py wired into `make validate`, plus a phi-scan allowlist entry for datagen/samples (generated names are expected there; the names list scans logs and summaries only), that fails on any committed data file outside datagen/samples/ above the sample record count or size limit."
+verify = "`make samples` twice leaves `git status` clean, `ls datagen/samples` shows one sample per feed each of 1,000 records, `make marker-check` and `make phi-scan` pass on the repo, and `make repo-weight` fails on a fixture data file larger than the limit placed outside datagen/samples and passes on the repo."
+covers = ["CAP-1"]
+after = [9]
+hitl = false
+risk = "low"
+
+[[entry]]
+id = 11
+type = "story"
+title = "Refactor sweep"
+description = "Cleans up the epic's code, limited to the findings listed in the Deferred section of each ticket plan in epic-synthetic-data; if there are none, it closes as a no-op."
+verify = "`make validate` passes and `make generate VOLUME=ci` gives the same SHA-256 as before the cleanup."
+covers = ["CAP-1"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+hitl = false
+risk = "low"
