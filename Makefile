@@ -5,38 +5,38 @@ PROFILE ?= demo
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
 
-resolve: ## Resolve config (defaults + PROFILE + versions.yaml) into config/resolved.yaml
-	uv run python config/load.py --profile $(PROFILE)
-
-validate-config: ## Validate defaults and every profile (demo, _template) against the JSON Schema
-	@for p in demo _template; do uv run python config/load.py --profile $$p --validate-only || exit 1; done
-
-lint-bytes-cap: ## AD-16: fail when PROFILE (name or yaml path) sets no cost.max_bytes_billed
-	uv run python config/load.py --profile $(PROFILE) --check-bytes-cap
-
-check-resolved: ## Fail if config/resolved.yaml is stale or hand-edited (CI calls this)
-	uv run python config/load.py --profile $(PROFILE) --check
-
 # The ticket's interface is `make phi-scan PATH=dir`, which overrides make's own PATH for
 # recipes. Only then do recipes run uv with a fixed system PATH (devcontainer and CI locations).
 SCAN_PATH := $(if $(filter command line,$(origin PATH)),$(PATH),)
 TOOL_PATH := /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(HOME)/.local/bin:$(HOME)/.cargo/bin
-GUARD = $(if $(SCAN_PATH),/usr/bin/env PATH="$(TOOL_PATH)") uv run python tools/guardrails.py
+# Same guard for every uv recipe, so targets keep finding uv when a caller overrides PATH.
+UV = $(if $(SCAN_PATH),/usr/bin/env PATH="$(TOOL_PATH)") uv
+GUARD = $(UV) run python tools/guardrails.py
 
-phi-scan: ## FR-35: fail on PHI-shaped values (SSN, generated names). PATH=dir, default repo
-	$(GUARD) phi-scan $(SCAN_PATH)
+resolve: ## Resolve config (defaults + PROFILE + versions.yaml) into config/resolved.yaml
+	$(UV) run python config/load.py --profile $(PROFILE)
+
+validate-config: ## Validate defaults and every profile (demo, _template) against the JSON Schema
+	@for p in demo _template; do $(UV) run python config/load.py --profile $$p --validate-only || exit 1; done
+
+lint-bytes-cap: ## AD-16: fail when PROFILE (name or yaml path) sets no cost.max_bytes_billed
+	$(UV) run python config/load.py --profile $(PROFILE) --check-bytes-cap
+
+check-resolved: ## Fail if config/resolved.yaml is stale or hand-edited (CI calls this)
+	$(UV) run python config/load.py --profile $(PROFILE) --check
+
+phi-scan: ## FR-35: fail on PHI-shaped values (SSN, generated names; uses datagen/out/names.txt when present). PATH=dir, default repo
+	$(GUARD) phi-scan $(SCAN_PATH) $(if $(wildcard datagen/out/names.txt),--names-file datagen/out/names.txt)
 
 marker-check: ## AD-14: fail on data files without the synthetic marker. PATH=dir, default repo
 	$(GUARD) marker-check $(SCAN_PATH)
 
-# Same PATH= guard as GUARD, so datagen targets keep finding uv when a caller overrides PATH.
-UV = $(if $(SCAN_PATH),/usr/bin/env PATH="$(TOOL_PATH)") uv
 VOLUME ?=
 
 generate: resolve ## Seeded synthetic data (VOLUME=ci -> datagen/out/; VOLUME=full -> estimate, budget guard, land in gs://$PROJECT-landing/, FORCE=1 overrides guard; EVAL=1 held-out eval seed)
 	$(UV) run python -m datagen generate $(if $(VOLUME),--volume $(VOLUME)) $(if $(EVAL),--eval) $(if $(FORCE),--force)
 
-generate-upload: resolve ## Land datagen/out/ files in the landing bucket and load mpi_eval.ground_truth
+generate-upload: resolve ## Land datagen/out/ (VOLUME=ci output; stale after a VOLUME=full run) in the landing bucket and load mpi_eval.ground_truth
 	$(UV) run python -m datagen upload
 
 samples: resolve ## FR-37: regenerate committed datagen/samples/ (repo_weight.sample_records per file, deterministic)

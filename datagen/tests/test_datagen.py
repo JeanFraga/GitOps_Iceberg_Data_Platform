@@ -209,3 +209,15 @@ def test_samples_deterministic_one_dir_per_feed(tmp_path):
     assert m["schema_drift"] and m["data_drift"]
     for e in (*m["schema_drift"], *m["data_drift"]):
         assert (tmp_path / "a" / e["file"]).is_file()
+
+
+def test_no_feed_emits_duplicate_truth_rows():
+    """The ground-truth writer collapses rows shared across feeds; no single feed may repeat a row."""
+    from datagen.generate import TRUTH_TABLES
+
+    ctx = _ctx()
+    for feed in registry.discover():
+        result = feed.generate(ctx)
+        for t in TRUTH_TABLES:
+            rows = [json.dumps(r, sort_keys=True) for r in getattr(result, t)]
+            assert len(rows) == len(set(rows)), f"{feed.source}/{feed.feed} repeats {t} rows"

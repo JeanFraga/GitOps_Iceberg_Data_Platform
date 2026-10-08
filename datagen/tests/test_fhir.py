@@ -126,3 +126,24 @@ def test_encounter_class_period_and_originals_only(out):
         else:
             assert kind == "P" and e["class"]["code"] == "AMB" and set(e["period"]) == {"start"}
     assert kinds == {"P", "I"}
+
+
+def test_encounter_subject_is_claim_member(out):
+    """Each Encounter's subject Patient is the same person as the NM1*IL member of its claims."""
+    truth = {(r["source"], r["source_record_id"]): r["person_truth"] for r in _truth(out, "person_truth")}
+    member = {}
+    for f in out.rglob("*.837"):
+        current = None
+        for seg in (s.strip() for s in f.read_text().split("~")):
+            if seg.startswith("NM1*IL*"):
+                current = seg.split("*")[9]
+            elif seg.startswith("CLM*"):
+                member[seg.split("*")[1]] = current
+    claims: dict[str, set] = {}
+    for r in _truth(out, "encounter_claim"):
+        claims.setdefault(r["encounter_id"], set()).add(r["claim_id"])
+    for e in _res(out, "encounter"):
+        person = truth[("emr_facility_1", e["subject"]["reference"].split("/")[1])]
+        assert claims[e["id"]]
+        for cid in claims[e["id"]]:
+            assert truth[("payer_a", member[cid])] == person
