@@ -48,9 +48,14 @@ repo-weight: ## FR-37: fail on committed data files over the record/byte limit o
 FILE ?=
 TRACER_SAMPLE := datagen/samples/payer_b/members/payer_b_members_2024.csv
 
-bronze: resolve ## Load one landed file into Bronze Iceberg (BigLake REST) and ops.file_lifecycle. FILE=gs://... required
-	@test -n "$(FILE)" || { echo "error: FILE=gs://<landing>/source=/feed=/ingest_date=/sha256=/<name> is required"; exit 1; }
-	$(UV) run python -m ingestion --profile $(PROFILE) --file $(FILE) $(if $(TABLE_SUFFIX),--table-suffix $(TABLE_SUFFIX))
+SRC ?=
+
+bronze: resolve ## Load landed files into Bronze Iceberg and ops.file_lifecycle. FILE=gs://... for one; empty FILE discovers all pending
+	$(UV) run python -m ingestion --profile $(PROFILE) $(if $(FILE),--file $(FILE)) $(if $(TABLE_SUFFIX),--table-suffix $(TABLE_SUFFIX))
+
+land: resolve ## Land SRC/<source>/<feed>/<file> immutably under AD-3 (overwrite rejected and logged). SRC=dir required
+	@test -n "$(SRC)" || { echo "error: SRC=<dir with <source>/<feed>/<file>> is required"; exit 1; }
+	$(UV) run python -m ingestion --profile $(PROFILE) --land $(SRC)
 
 bronze-tracer-land: resolve ## Land the committed payer_b members sample (no-op if already landed); prints its gs:// URI
 	@sha=$$(sha256sum $(TRACER_SAMPLE) | cut -d' ' -f1); \
@@ -115,4 +120,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check repo-weight tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: bronze bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: bronze land bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

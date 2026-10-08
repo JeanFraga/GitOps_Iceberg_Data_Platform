@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from collections.abc import Callable
@@ -22,6 +23,32 @@ def _sha_landed(run: Runner, prefix: str, sha: str) -> bool:
     return res.returncode == 0 and f"/sha256={sha}/" in res.stdout
 
 
+LANDED, REJECTED_OVERWRITE = "landed", "rejected_overwrite"
+
+
+def landing_uri(bucket: str, source: str, feed: str, ingest_date: str, sha: str, name: str) -> str:
+    """AD-3 landing path: source=/feed=/ingest_date=/sha256=/<name>."""
+    return f"gs://{bucket}/source={source}/feed={feed}/ingest_date={ingest_date}/sha256={sha}/{name}"
+
+
+def land_file(
+    path: Path, source: str, feed: str, bucket: str, ingest_date: str, run: Runner, sha: str | None = None
+) -> tuple[str, str]:
+    """cp --if-generation-match=0 one file to its AD-3 path; no sha pre-skip.
+
+    Returns (LANDED | REJECTED_OVERWRITE, target). An existing object is never replaced.
+    """
+    sha = sha or hashlib.sha256(path.read_bytes()).hexdigest()
+    target = landing_uri(bucket, source, feed, ingest_date, sha, path.name)
+    res = run(["gcloud", "storage", "cp", "--if-generation-match=0", str(path), target],
+              capture_output=True, text=True, check=False)  # fmt: skip
+    if res.returncode == 0:
+        return LANDED, target
+    if "412" in (res.stderr or "") or "precondition" in (res.stderr or "").lower():
+        return REJECTED_OVERWRITE, target
+    raise UploadError(f"upload failed for {path.name}: {(res.stderr or '').strip()}")
+
+
 def upload_landing(
     manifest: dict, out: Path, bucket: str, ingest_date: str, run: Runner, totals: dict | None = None
 ) -> list[str]:
@@ -35,21 +62,19 @@ def upload_landing(
         totals["bytes"] += (out / f["path"]).stat().st_size
         prefix = f"gs://{bucket}/source={f['source']}/feed={f['feed']}/"
         name = Path(f["path"]).name
-        target = f"{prefix}ingest_date={ingest_date}/sha256={f['sha256']}/{name}"
         if _sha_landed(run, prefix, f["sha256"]):
             log.append(f"skip (already landed): {name}")
             continue
-        res = run(
-            ["gcloud", "storage", "cp", "--if-generation-match=0", str(out / f["path"]), target],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if res.returncode != 0:
+        err: UploadError | None = None
+        try:
+            status, target = land_file(out / f["path"], f["source"], f["feed"], bucket, ingest_date, run, f["sha256"])
+        except UploadError as exc:
+            status, target, err = REJECTED_OVERWRITE, "", exc
+        if status != LANDED:
             if _sha_landed(run, prefix, f["sha256"]):  # lost a race to an identical upload
                 log.append(f"skip (already landed): {name}")
                 continue
-            raise UploadError(f"upload failed for {name}: {res.stderr.strip()}")
+            raise err or UploadError(f"upload failed for {name}: precondition failed")
         log.append(f"landed: {target}")
     return log
 

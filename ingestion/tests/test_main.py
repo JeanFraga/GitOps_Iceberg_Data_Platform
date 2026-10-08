@@ -65,6 +65,7 @@ class FakeOps:
             lambda **kw: [{k: s.get(k) for k in ("state", "table", "branch")} for s in self.lifecycle],
         )
         monkeypatch.setattr(cli.lifecycle, "quarantine", lambda **kw: self.quarantine.append(kw))
+        monkeypatch.setattr(cli.lifecycle, "sha_seen_elsewhere", lambda **kw: False)
         return self
 
     @property

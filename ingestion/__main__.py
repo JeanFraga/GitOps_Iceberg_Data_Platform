@@ -24,13 +24,13 @@ from pathlib import Path
 import yaml
 
 from config.fingerprint import csv_layout, fingerprint, fp8
-from ingestion import bronze, drift, eras, lifecycle, reconcile
+from ingestion import bronze, discover, drift, eras, land, lifecycle, reconcile
+from ingestion.discover import URI_RE
 from ingestion.marker import UnmarkedFile, check_marker, drop_marker_line
 from ingestion.records import split
 from pipeline import runner
 
 RESOLVED = Path(__file__).resolve().parent.parent / "config" / "resolved.yaml"
-URI_RE = re.compile(r"^gs://[^/]+/source=(?P<source>[^/]+)/feed=(?P<feed>[^/]+)/.*?sha256=(?P<sha>[0-9a-f]{64})/[^/]+$")
 
 
 def log(event: str, **fields) -> None:
@@ -96,6 +96,20 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
     except UnmarkedFile:
         log("refused_unmarked", object_uri=uri, file_sha256=sha, run_id=run_id)
         raise
+
+    # AD-3 duplicate: the same bytes already have lifecycle rows under another object_uri.
+    # This object goes landed -> rejected_duplicate (terminal); the original keeps its own state.
+    if lifecycle.sha_seen_elsewhere(project_id=project, max_bytes_billed=cap, file_sha256=sha, object_uri=uri):
+        own = lifecycle.rows_for_uris(project_id=project, max_bytes_billed=cap, uris=[uri]).get(uri, [])
+        if "rejected_duplicate" not in own:
+            dup = {"project_id": project, "max_bytes_billed": cap, "file_sha256": sha, "object_uri": uri,
+                   "source": source, "feed": feed, "run_id": run_id, "storage_class": None}  # fmt: skip
+            if not own:
+                lifecycle.record(**dup, state="landed", detail={"bytes": len(data)})
+                log("landed", object_uri=uri, file_sha256=sha, run_id=run_id)
+            lifecycle.record(**dup, state="rejected_duplicate", detail={"reason": "sha256_landed_under_other_uri"})
+        log("rejected_duplicate", object_uri=uri, file_sha256=sha, run_id=run_id)
+        return {"run_id": run_id, "skipped": "rejected_duplicate", "object_uri": uri}
 
     # AD-5: route on the fingerprint of the header (marker line dropped), never on dates or names.
     records = drop_marker_line(split(data, "csv"))
@@ -185,36 +199,95 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
     return {"run_id": run_id, **detail, "bigquery": read}
 
 
+EXIT_CODES = ((UnmarkedFile, 3), (UnsupportedFormat, 5), (ReconcileFail, 4))
+
+
+def exit_code(exc: BaseException) -> int:
+    """Type-only error line; exception text can carry row values."""
+    for kind, code in EXIT_CODES:
+        if isinstance(exc, kind):
+            msg = {3: "no synthetic marker; file refused", 5: "not a CSV delivery; file refused",
+                   4: "reconcile gate failed; file quarantined, main untouched"}[code]  # fmt: skip
+            log("error", error_type=kind.__name__, error=msg)
+            return code
+    if isinstance(exc, subprocess.CalledProcessError):
+        log("error", error_type="CalledProcessError", error="external command failed", returncode=exc.returncode)
+        return 1
+    log("error", error_type=type(exc).__name__, error="load failed")
+    return 1
+
+
+def record_discovered_landed(cfg: dict, uri: str, run_id: str) -> None:
+    """Discovery records `landed` once for a listed object with no lifecycle row, before any marker check."""
+    m = URI_RE.match(uri)
+    lifecycle.record(project_id=cfg["project_id"], max_bytes_billed=cfg["cost"]["max_bytes_billed"],
+                     file_sha256=m["sha"], object_uri=uri, source=m["source"], feed=m["feed"], state="landed",
+                     run_id=run_id, storage_class=None, detail={"discovered": True})  # fmt: skip
+    log("landed", object_uri=uri, file_sha256=m["sha"], run_id=run_id, discovered=True)
+
+
+def run_batch(cfg: dict, run_id: str, table_suffix: str = "") -> dict:
+    """Load every pending landing object; one failure never stops the others."""
+    project, cap = cfg["project_id"], cfg["cost"]["max_bytes_billed"]
+    todo = discover.pending(project, cap, f"{project}-landing")
+    log("discovered", run_id=run_id, pending=len(todo))
+    summary: dict = {"loaded": [], "skipped": [], "failed": {}}
+    for uri, has_rows in todo:
+        if not uri.lower().endswith(".csv"):
+            log("skipped_unsupported_format", object_uri=uri, run_id=run_id)
+            summary["skipped"].append(uri)
+            continue
+        # One run_id per file: the reconcile gate reads branch rows by _run_id, so files sharing a run_id
+        # in one table would be counted together. The batch lock stays held under the batch run_id.
+        file_run = runner.mint_run_id(datetime.now(UTC))
+        try:
+            if not has_rows:
+                record_discovered_landed(cfg, uri, file_run)
+            out = load(cfg, uri, file_run, table_suffix)
+            (summary["skipped"] if out.get("skipped") else summary["loaded"]).append(uri)
+        except Exception as exc:  # noqa: BLE001 - per-file isolation; logged type-only
+            log("file_failed", object_uri=uri, run_id=file_run, batch_run_id=run_id)
+            summary["failed"][uri] = exit_code(exc)
+    return summary
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True)
-    parser.add_argument("--file", required=True)
+    parser.add_argument("--file", default="", help="one landed gs:// URI; empty runs batch discovery")
+    parser.add_argument("--land", default="", metavar="SRC", help="land SRC/<source>/<feed>/<file> under AD-3")
     parser.add_argument("--table-suffix", default="", help="demo only: load into <feed>__<era><suffix>")
     args = parser.parse_args(argv)
     cfg = yaml.safe_load(RESOLVED.read_text())
     if cfg["profile"] != args.profile:
         log("error", error=f"resolved.yaml is for profile {cfg['profile']}; run make resolve PROFILE={args.profile}")
         return 2
+    if args.land:
+        try:
+            out = land.land_dir(Path(args.land), f"{cfg['project_id']}-landing", datetime.now(UTC).date().isoformat(),
+                                log)  # fmt: skip
+        except Exception as exc:  # noqa: BLE001 - type only
+            log("error", error_type=type(exc).__name__, error="land failed")
+            return 1
+        log("land_done", landed=len(out["landed"]), rejected_overwrite=len(out["rejected_overwrite"]))
+        return 0
     backend = runner.BigQueryBackend(cfg["project_id"], cfg["cost"]["max_bytes_billed"])
     result: dict = {}
+    if not args.file:
+        try:
+            runner.run(backend, f"{cfg['profile']}:bronze", cfg["run"]["lock_ttl_minutes"],
+                       task=lambda run_id: result.update(run_batch(cfg, run_id, args.table_suffix)))  # fmt: skip
+        except Exception as exc:  # noqa: BLE001 - type only
+            return exit_code(exc)
+        failed = result["failed"]
+        log("batch_done", loaded=len(result["loaded"]), skipped=len(result["skipped"]), failed=sorted(failed))
+        codes = set(failed.values())
+        return 0 if not codes else codes.pop() if len(codes) == 1 else 1
     try:
         runner.run(backend, f"{cfg['profile']}:bronze", cfg["run"]["lock_ttl_minutes"],
                    task=lambda run_id: result.update(load(cfg, args.file, run_id, args.table_suffix)))  # fmt: skip
-    except UnmarkedFile:
-        log("error", error_type="UnmarkedFile", error="no synthetic marker; file refused")
-        return 3
-    except UnsupportedFormat:
-        log("error", error_type="UnsupportedFormat", error="not a CSV delivery; file refused")
-        return 5
-    except ReconcileFail:
-        log("error", error_type="ReconcileFail", error="reconcile gate failed; file quarantined, main untouched")
-        return 4
-    except subprocess.CalledProcessError as exc:
-        log("error", error_type="CalledProcessError", error="external command failed", returncode=exc.returncode)
-        return 1
     except Exception as exc:  # noqa: BLE001 - type only: exception text can carry row values
-        log("error", error_type=type(exc).__name__, error="load failed")
-        return 1
+        return exit_code(exc)
     log("done", **result)
     return 0
 

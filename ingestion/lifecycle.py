@@ -85,3 +85,36 @@ def quarantine(
         f"VALUES (@sha, {'@ord' if line_ordinal is not None else 'NULL'}, @reason, NULL, @run, CURRENT_TIMESTAMP())"
     )
     run([*bq_query_args(project_id, max_bytes_billed), *params, sql], check=True, capture_output=True, text=True)
+
+
+def rows_for_uris(
+    *, project_id: str, max_bytes_billed: int, uris: list[str], run: Runner = subprocess.run
+) -> dict[str, list[str]]:
+    """{object_uri: [state, ...] oldest first} for the given landing URIs (discovery join)."""
+    if not uris:
+        return {}
+    sql = (f"SELECT object_uri, state FROM `{project_id}.ops.file_lifecycle` "
+           "WHERE object_uri IN UNNEST(@uris) ORDER BY recorded_at")  # fmt: skip
+    param = f"--parameter=uris:ARRAY<STRING>:{json.dumps(uris)}"
+    out = run([*bq_query_args(project_id, max_bytes_billed), "--format=json", param, sql],
+              check=True, capture_output=True, text=True).stdout  # fmt: skip
+    rows = json.loads(out) if out.lstrip().startswith("[") else []
+    found: dict[str, list[str]] = {}
+    for r in rows:
+        found.setdefault(r["object_uri"], []).append(r["state"])
+    return found
+
+
+def sha_seen_elsewhere(
+    *, project_id: str, max_bytes_billed: int, file_sha256: str, object_uri: str, run: Runner = subprocess.run
+) -> bool:
+    """AD-3 duplicate: this sha has lifecycle rows under another object_uri that was not itself rejected_duplicate."""
+    sql = (f"SELECT COUNT(*) AS n FROM `{project_id}.ops.file_lifecycle` "
+           "WHERE file_sha256 = @sha AND object_uri != @uri AND object_uri NOT IN ("
+           f"SELECT object_uri FROM `{project_id}.ops.file_lifecycle` "
+           "WHERE file_sha256 = @sha AND state = 'rejected_duplicate')")  # fmt: skip
+    args = [*bq_query_args(project_id, max_bytes_billed), "--format=json",
+            f"--parameter=sha:STRING:{file_sha256}", f"--parameter=uri:STRING:{object_uri}"]  # fmt: skip
+    out = run([*args, sql], check=True, capture_output=True, text=True).stdout
+    rows = json.loads(out) if out.lstrip().startswith("[") else []
+    return bool(rows) and int(rows[0]["n"]) > 0
