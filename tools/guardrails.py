@@ -77,7 +77,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--names", action="extend", nargs=1, default=[], metavar="NAME", help="generated full name to flag; repeatable"
     )
+    parser.add_argument("--names-file", metavar="PATH", help="file of generated full names, one per line")
     args = parser.parse_args(argv)
+    if args.names_file:
+        args.names += Path(args.names_file).read_text().splitlines()
     try:
         findings = phi_scan(args.path, args.names) if args.check == "phi-scan" else marker_check(args.path)
     except FileNotFoundError as exc:

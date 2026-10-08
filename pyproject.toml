@@ -22,4 +22,4 @@ line-length = 120
 extend-exclude = ["_bmad", "_bmad-output", ".agents", ".claude"]
 
 [tool.pytest.ini_options]
-testpaths = ["config", "tests", "pipeline"]
+testpaths = ["config", "tests", "pipeline", "datagen"]

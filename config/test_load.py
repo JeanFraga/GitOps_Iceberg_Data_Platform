@@ -21,6 +21,8 @@ VALID_DEFAULTS = (
     "drift:\n  data_drift_thresholds: null\n  mode: report_only\n"
     "budget:\n  amount_usd: 5\n  alert_thresholds: [0.5, 0.9, 1.0]\n"
     "run:\n  lock_ttl_minutes: 120\n"
+    "datagen:\n  seed: 1\n  eval_seed: 2\n  volume_profile: ci\n  volume_profiles:\n"
+    "    ci: {records_per_file: 1, years: 1}\n    full: {records_per_file: 2, years: 1}\n"
 )
 VALID_PROFILE = (
     "profile: demo\nproject_id: demo-project-1\nregion: us-east1\n"

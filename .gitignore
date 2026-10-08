@@ -51,3 +51,6 @@ secrets/
 .env.*
 !.env.example
 !config/schemas/*.json
+
+# Synthetic data output (never commit generated data)
+datagen/out/

@@ -14,7 +14,8 @@
     "drift",
     "billing_account",
     "budget",
-    "run"
+    "run",
+    "datagen"
   ],
   "properties": {
     "profile": {
@@ -135,6 +136,77 @@
         "lock_ttl_minutes": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "datagen": {
+      "description": "Synthetic data generator (datagen/).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seed",
+        "eval_seed",
+        "volume_profile",
+        "volume_profiles"
+      ],
+      "properties": {
+        "seed": {
+          "type": "integer"
+        },
+        "eval_seed": {
+          "type": "integer"
+        },
+        "volume_profile": {
+          "enum": [
+            "ci",
+            "full"
+          ]
+        },
+        "volume_profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ci",
+            "full"
+          ],
+          "properties": {
+            "ci": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "records_per_file",
+                "years"
+              ],
+              "properties": {
+                "records_per_file": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "years": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "full": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "records_per_file",
+                "years"
+              ],
+              "properties": {
+                "records_per_file": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "years": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
         }
       }
     }

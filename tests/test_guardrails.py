@@ -48,3 +48,13 @@ def test_repo_default_skips_allowlisted_fixtures():
 
 def test_missing_path_is_an_error():
     assert guardrails.main(["phi-scan", "no/such/dir"]) == 2
+
+
+def test_phi_scan_names_file(tmp_path):
+    (tmp_path / "scan").mkdir()
+    (tmp_path / "scan" / "summary.txt").write_text("loaded member Ada Lovelace\n")
+    names = tmp_path / "names.txt"
+    names.write_text("Grace Hopper\nAda Lovelace\n")
+    assert guardrails.main(["phi-scan", "--names-file", str(names), str(tmp_path / "scan")]) == 1
+    names.write_text("Grace Hopper\n")
+    assert guardrails.main(["phi-scan", "--names-file", str(names), str(tmp_path / "scan")]) == 0

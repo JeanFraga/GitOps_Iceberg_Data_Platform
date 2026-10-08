@@ -16,3 +16,11 @@ budget:
 # AD-17: one pipeline run per client; ops.run_lock expires after this TTL.
 run:
   lock_ttl_minutes: 120
+# Epic synthetic-data: seeded generator (python -m datagen). Same seed + profile = same bytes.
+datagen:
+  seed: 20261008
+  eval_seed: 20261009
+  volume_profile: ci
+  volume_profiles:
+    ci: {records_per_file: 5000, years: 1}
+    full: {records_per_file: 30000, years: 2}

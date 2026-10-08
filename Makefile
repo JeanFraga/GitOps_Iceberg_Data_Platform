@@ -29,6 +29,16 @@ phi-scan: ## FR-35: fail on PHI-shaped values (SSN, generated names). PATH=dir, 
 marker-check: ## AD-14: fail on data files without the synthetic marker. PATH=dir, default repo
 	$(GUARD) marker-check $(SCAN_PATH)
 
+# Same PATH= guard as GUARD, so datagen targets keep finding uv when a caller overrides PATH.
+UV = $(if $(SCAN_PATH),/usr/bin/env PATH="$(TOOL_PATH)") uv
+VOLUME ?=
+
+generate: resolve ## Seeded synthetic data into datagen/out/ (VOLUME=ci|full, default datagen.volume_profile)
+	$(UV) run python -m datagen generate $(if $(VOLUME),--volume $(VOLUME))
+
+generate-upload: resolve ## Land datagen/out/ files in the landing bucket and load mpi_eval.ground_truth
+	$(UV) run python -m datagen upload
+
 upgrade: ## Manual platform upgrade (AD-20/FR-40): prints the platform-upgrade skill invocation
 	@echo "Platform upgrades run through the Claude Code skill .claude/skills/platform-upgrade."
 	@echo "In Claude Code, run:  /platform-upgrade"
@@ -86,4 +96,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

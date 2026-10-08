@@ -8,6 +8,17 @@ budget:
   amount_usd: 5
 cost:
   max_bytes_billed: 10737418240
+datagen:
+  eval_seed: 20261009
+  seed: 20261008
+  volume_profile: ci
+  volume_profiles:
+    ci:
+      records_per_file: 5000
+      years: 1
+    full:
+      records_per_file: 30000
+      years: 2
 drift:
   data_drift_thresholds: null
   mode: report_only
