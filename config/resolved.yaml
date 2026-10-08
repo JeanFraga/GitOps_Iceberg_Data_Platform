@@ -9,6 +9,33 @@ budget:
 cost:
   max_bytes_billed: 10737418240
 datagen:
+  data_drift:
+  - scenario: code_mix
+    source: payer_b
+    feed: members
+    field: sex
+    codes:
+    - '1'
+    - '2'
+    magnitude: 0.5
+  - scenario: null_rate
+    source: payer_b
+    feed: members
+    field: pcp_npi
+    rate: 0.6
+    magnitude: 0.4
+  - scenario: unit_scale
+    source: payer_a
+    feed: pharmacy
+    field: quantity_dispensed
+    factor: 1000
+    magnitude: 10
+  - scenario: amount_shift
+    source: payer_a
+    feed: pharmacy
+    field: total_amount_paid
+    factor: 1.8
+    magnitude: 0.4
   edge_case_rate: 0.02
   eval_only_scenarios:
   - twin

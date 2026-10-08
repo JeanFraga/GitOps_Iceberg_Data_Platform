@@ -6,7 +6,7 @@ import argparse
 import subprocess
 import sys
 
-from datagen import config, drift, noise
+from datagen import config, data_drift, drift, noise
 from datagen.generate import Context, generate
 from datagen.upload import UploadError, upload
 
@@ -34,6 +34,7 @@ def main(argv: list[str] | None = None) -> int:
                 scenarios=noise.scenario_set() if args.eval else train_scenarios,
                 run="eval" if args.eval else "train",
                 schema_drift=tuple(dg.get("schema_drift", [])),
+                data_drift=tuple(dg.get("data_drift", [])),
             )
             manifest = generate(ctx)
             for f in manifest["files"]:
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         config.VolumeError,
         noise.ScenarioError,
         drift.DriftError,
+        data_drift.DataDriftError,
         UploadError,
         subprocess.CalledProcessError,
     ) as exc:

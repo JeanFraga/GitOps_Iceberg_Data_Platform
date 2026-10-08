@@ -29,6 +29,11 @@ datagen:
     - {scenario: cast_failure, source: payer_a, feed: pharmacy, field: quantity_dispensed}
     - {scenario: remove_column, source: provider_directory, feed: providers, field: credential}
     - {scenario: date_format, source: emr_facility_1, feed: patient, field: birthDate}
+  data_drift:
+    - {scenario: code_mix, source: payer_b, feed: members, field: sex, codes: ["1", "2"], magnitude: 0.5}
+    - {scenario: null_rate, source: payer_b, feed: members, field: pcp_npi, rate: 0.6, magnitude: 0.4}
+    - {scenario: unit_scale, source: payer_a, feed: pharmacy, field: quantity_dispensed, factor: 1000, magnitude: 10}
+    - {scenario: amount_shift, source: payer_a, feed: pharmacy, field: total_amount_paid, factor: 1.8, magnitude: 0.4}
   volume_profiles:
     ci: {records_per_file: 5000, years: 1}
     full: {records_per_file: 30000, years: 2}
