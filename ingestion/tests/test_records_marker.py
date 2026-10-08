@@ -76,3 +76,10 @@ def test_non_utf8_record_stored_base64():
     _, rows = rows_for(data)
     assert rows[0][0] is None and rows[0][2] == "base64"
     assert base64.b64decode(rows[0][1]) == b"\xff\xfe"
+
+
+def test_stray_mid_field_quote_does_not_swallow_records():
+    data = MARKER + b'id,name\n1,O"Brien\n2,b\n3,"x ""y""\nz"\n'
+    _, rows = rows_for(data)
+    assert [r[4] for r in rows] == [3, 4, 5]
+    assert rows[0][2] == '1,O"Brien' and rows[2][1] == 'x "y"\nz'

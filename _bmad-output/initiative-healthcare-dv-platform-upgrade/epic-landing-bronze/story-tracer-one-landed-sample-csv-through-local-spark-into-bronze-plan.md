@@ -3,20 +3,41 @@ title: 'Tracer: one landed sample CSV through local Spark into Bronze Iceberg, r
 type: 'feature'
 ticket: '1'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'c3f96e8079bf707a007a9cdd1d0fb515364244ee'
 route: 'full'
 route_source: 'auto'
 risk: 'high'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/initiative-healthcare-dv-platform-upgrade/epic-landing-bronze/epic-landing-bronze.md'
 warnings: []
-deferred: []
+deferred:
+  - summary: >-
+      BigLake IAM grant for runtime-sa is not applied to demo.
+    evidence: |-
+      A stale Terraform state lock (ID 1791492655983054) blocks the apply. The permission check refused the force-unlock, so the owner has to run force-unlock and then make apply.
+    location: >-
+      infra/modules/iam/main.tf
+    severity: medium
+  - summary: >-
+      Each run records another landed row before the Bronze write, so a failed run leaves an orphan landed row.
+    evidence: |-
+      ingestion/__main__.py load records landed on every invocation, and three orphan rows already exist on demo. WAP (3.2) and intake (3.4) take over this logic.
+    location: >-
+      ingestion/__main__.py
+    severity: medium
+  - summary: >-
+      Ragged CSV rows are silently padded or cut in the typed columns.
+    evidence: |-
+      bronze.py build_rows pads missing fields or cuts extra ones to the header length. _raw_line keeps the original text. Should be flagged or counted once reconcile lands (3.2).
+    location: >-
+      ingestion/bronze.py
+    severity: low
 ---
 
 <intent-contract>
@@ -131,6 +152,30 @@ Other notes:
 - 2026-10-08: lineage column `_file_sha256` renamed `_landed_sha256` (BigQuery reserved prefix, see Implementation Notes).
 
 ## Review Triage Log
+
+### 2026-10-08 — Review pass
+- verdicts: 11 findings — high 0, medium 4, low 6, false 0, maybe-false 0 (1 unmet task counted as medium)
+- findings:
+  - `medium` `defer` IAM grant not applied. Blocked by the stale state lock, which needs the owner.
+  - `medium` `patch` A stray quote swallows the rest of the file in `_split_lf`. Fixed with RFC 4180 field-start quote tracking, plus a test.
+  - `low` `defer` Ragged rows are padded or cut silently. `_raw_line` keeps the data; fold into reconcile (3.2).
+  - `medium` `defer` landed is recorded before the write and repeated on every run. WAP (3.2) and intake (3.4) take this over.
+  - `low` `patch` bronze_appended was recorded before the BigQuery proof. The proof now runs before the success row.
+  - `medium` `patch` Error handlers could log row values. They now log only the error type, a fixed message and the return code.
+  - `low` `reject` Makefile landing helper duplicates upload.py. Tracer-only helper; a race only means a nonzero exit, not data loss.
+  - `low` `reject` Full JDK instead of headless. The Adoptium repo has no headless temurin-21 JDK; image size only.
+  - `low` `patch` Snapshot id came from the latest snapshot. Now selected by summary run_id.
+  - `low` `patch` UNMARKED nonzero exit via main was untested. Added a test through cli.main.
+  - `low` `reject` The Spark test reads versions.yaml directly. Keys are identical, so there is no observable defect.
+
+## Auto Run Result
+
+- Summary: tracer Bronze load (local Spark 4.0.4, Java 21, Iceberg 1.12.0 and gcp bundle) into BigLake REST, with a BigQuery read proof and ops.file_lifecycle rows. OQ 2/3/5 are settled (see Implementation Notes).
+- Files: versions.yaml, pyproject.toml, uv.lock, config/resolved.yaml, .devcontainer/Dockerfile, config/standards/records.yaml, ingestion/*, pipeline/runner.py (task argument plus lock backend fixes), infra/modules/iam/main.tf, Makefile.
+- Review: 5 patched (2 medium, 3 low), 3 deferred, 3 rejected (reasons above).
+- Follow-up review recommended: true. Two medium patches touched the record splitter, which is the basis for 3.2's reconcile gate, and they have not been re-run on demo.
+- Verification: `uv run pytest ingestion pipeline config` gave 64 passed. `make validate` passed. A live demo run before the patches gave 720 rows with min ordinal 3 and both lifecycle states.
+- Residual risk: the IAM grant is not applied, and the patched code has not been re-run on demo.
 
 ## Design Notes
 

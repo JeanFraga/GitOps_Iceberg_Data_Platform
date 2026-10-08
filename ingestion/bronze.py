@@ -113,5 +113,10 @@ def append(spark, namespace: str, table: str, columns: list[str], rows: list[tup
     ddl = ", ".join([f"`{c}` string" for c in columns] + [f"`{n}` {t}" for n, t in LINEAGE])
     spark.sql(f"CREATE TABLE IF NOT EXISTS {ident} ({ddl}) USING iceberg PARTITIONED BY (days(_ingested_at))")
     df.writeTo(ident).option("snapshot-property.run_id", run_id).append()
-    snap = spark.sql(f"SELECT snapshot_id FROM {ident}.snapshots ORDER BY committed_at DESC LIMIT 1").collect()
+    snap = spark.sql(
+        f"SELECT snapshot_id FROM {ident}.snapshots WHERE summary['run_id'] = '{run_id}' "
+        "ORDER BY committed_at DESC LIMIT 1"
+    ).collect()
+    if not snap:
+        raise BronzeError("no snapshot tagged with this run_id")
     return int(snap[0]["snapshot_id"])

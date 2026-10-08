@@ -46,14 +46,26 @@ def strip_bom(data: bytes) -> bytes:
 def _split_lf(data: bytes, quoted: bool) -> list[Record]:
     out: list[Record] = []
     line, start, in_quotes, buf_start = 1, 1, False, 0
-    for i, byte in enumerate(data):
-        if quoted and byte == 0x22:
-            in_quotes = not in_quotes  # "" toggles twice, so escaped quotes keep the state
+    field_start = True  # RFC 4180: a quote opens quoting only at the start of a field
+    i, n = 0, len(data)
+    while i < n:
+        byte = data[i]
+        if quoted and in_quotes:
+            if byte == 0x22:
+                if i + 1 < n and data[i + 1] == 0x22:
+                    i += 1  # "" escape inside quotes
+                else:
+                    in_quotes = False
+            elif byte == 0x0A:
+                line += 1
+        elif quoted and byte == 0x22 and field_start:
+            in_quotes = True
         elif byte == 0x0A:
-            if not in_quotes:
-                out.append(Record(start, data[buf_start:i].removesuffix(b"\r")))
-                buf_start, start = i + 1, line + 1
+            out.append(Record(start, data[buf_start:i].removesuffix(b"\r")))
+            buf_start, start = i + 1, line + 1
             line += 1
+        field_start = not in_quotes and byte in (0x2C, 0x0A)
+        i += 1
     if buf_start < len(data):
         out.append(Record(start, data[buf_start:].removesuffix(b"\r")))
     return out

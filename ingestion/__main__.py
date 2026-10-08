@@ -84,14 +84,14 @@ def load(cfg: dict, uri: str, run_id: str) -> dict:
         spark.stop()
     detail = {"rows": len(rows), "era": FIXED_ERA, "fingerprint": fp, "fp8": fp8(fp),
               "table": f"{namespace}.{table}", "snapshot_id": snapshot_id}  # fmt: skip
-    lifecycle.record(**common, state="bronze_appended", detail=detail)
-    log("bronze_appended", object_uri=uri, file_sha256=sha, run_id=run_id, **detail)
 
     table_ref = f"{project}.{project}-warehouse.{namespace}.{table}"
     read = bq_count(project, cap, table_ref, run_id)
     log("bigquery_read", table_ref=table_ref, run_id=run_id, **read)
     if read["rows"] != len(rows):
         raise RuntimeError(f"BigQuery read {read['rows']} rows, appended {len(rows)}")
+    lifecycle.record(**common, state="bronze_appended", detail=detail)
+    log("bronze_appended", object_uri=uri, file_sha256=sha, run_id=run_id, **detail)
     return {"run_id": run_id, **detail, "bigquery": read}
 
 
@@ -109,22 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         runner.run(backend, f"{cfg['profile']}:bronze", cfg["run"]["lock_ttl_minutes"],
                    task=lambda run_id: result.update(load(cfg, args.file, run_id)))  # fmt: skip
-    except UnmarkedFile as exc:
-        log("error", error_type="UnmarkedFile", error=str(exc))
+    except UnmarkedFile:
+        log("error", error_type="UnmarkedFile", error="no synthetic marker; file refused")
         return 3
     except subprocess.CalledProcessError as exc:
-        log(
-            "error",
-            error_type="CalledProcessError",
-            cmd=exc.cmd[:3],
-            returncode=exc.returncode,
-            stderr=(exc.stderr or b"")[-400:]
-            if isinstance(exc.stderr, str)
-            else (exc.stderr or b"")[-400:].decode(errors="replace"),
-        )
+        log("error", error_type="CalledProcessError", error="external command failed", returncode=exc.returncode)
         return 1
-    except Exception as exc:  # noqa: BLE001 - one structured line, no row values
-        log("error", error_type=type(exc).__name__, error=str(exc)[:500])
+    except Exception as exc:  # noqa: BLE001 - type only: exception text can carry row values
+        log("error", error_type=type(exc).__name__, error="load failed")
         return 1
     log("done", **result)
     return 0
