@@ -1,0 +1,38 @@
+[
+  {
+    "name": "file_sha256",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "SHA-256 of the source file"
+  },
+  {
+    "name": "line_ordinal",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "1-based line number, if line-level"
+  },
+  {
+    "name": "reason",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Why the record was quarantined"
+  },
+  {
+    "name": "raw_line",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Raw quarantined line"
+  },
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run that quarantined it"
+  },
+  {
+    "name": "quarantined_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When it was quarantined"
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run that computed the metric"
+  },
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Matching model version"
+  },
+  {
+    "name": "threshold_set_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Threshold set version"
+  },
+  {
+    "name": "eval_seed",
+    "type": "INT64",
+    "mode": "REQUIRED",
+    "description": "Evaluation seed"
+  },
+  {
+    "name": "metric",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Metric name"
+  },
+  {
+    "name": "value",
+    "type": "FLOAT64",
+    "mode": "REQUIRED",
+    "description": "Metric value"
+  },
+  {
+    "name": "computed_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the metric was computed"
+  }
+]

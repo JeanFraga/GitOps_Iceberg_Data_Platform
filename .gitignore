@@ -43,6 +43,7 @@ Thumbs.db
 # negate intentionally tracked JSON files explicitly below.
 *.json
 !.devcontainer/devcontainer.json
+!infra/modules/bq_ops/schemas/*.json
 secrets/
 
 # Local environment – never commit these

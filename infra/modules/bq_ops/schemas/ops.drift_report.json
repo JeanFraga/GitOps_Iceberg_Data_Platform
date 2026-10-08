@@ -1,0 +1,50 @@
+[
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run that detected drift"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Source system"
+  },
+  {
+    "name": "feed",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Feed within the source"
+  },
+  {
+    "name": "schema_era",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Schema era of the file"
+  },
+  {
+    "name": "drift_kind",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Kind of drift"
+  },
+  {
+    "name": "detail",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Drift detail"
+  },
+  {
+    "name": "mode",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Drift mode (report_only, enforce)"
+  },
+  {
+    "name": "reported_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When drift was reported"
+  }
+]

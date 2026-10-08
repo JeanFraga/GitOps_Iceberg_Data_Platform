@@ -1,0 +1,38 @@
+[
+  {
+    "name": "candidate_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Review candidate id"
+  },
+  {
+    "name": "pair_hk",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Hash key of the record pair"
+  },
+  {
+    "name": "scores",
+    "type": "JSON",
+    "mode": "REQUIRED",
+    "description": "Match scores"
+  },
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Matching model version"
+  },
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run that queued the pair"
+  },
+  {
+    "name": "queued_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the pair was queued"
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "name": "file_sha256",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "SHA-256 of the landed object"
+  },
+  {
+    "name": "object_uri",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "gs:// URI of the landed object"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Source system"
+  },
+  {
+    "name": "feed",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Feed within the source"
+  },
+  {
+    "name": "state",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Lifecycle state"
+  },
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run that recorded the transition"
+  },
+  {
+    "name": "recorded_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the state was recorded"
+  },
+  {
+    "name": "storage_class",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "GCS storage class at record time"
+  },
+  {
+    "name": "detail",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Extra transition detail"
+  }
+]

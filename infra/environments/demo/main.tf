@@ -60,6 +60,13 @@ resource "google_bigquery_dataset" "ops" {
   delete_contents_on_destroy = true
 }
 
+module "bq_ops" {
+  source         = "../../modules/bq_ops"
+  project_id     = local.cfg.project_id
+  region         = local.cfg.region
+  ops_dataset_id = google_bigquery_dataset.ops.dataset_id
+}
+
 output "ops_dataset_id" {
   value = google_bigquery_dataset.ops.dataset_id
 }
@@ -78,4 +85,20 @@ output "dashboard_sa_email" {
 
 output "landing_bucket" {
   value = module.storage.landing_bucket
+}
+
+output "warehouse_bucket" {
+  value = module.storage.warehouse_bucket
+}
+
+output "iceberg_catalog" {
+  value = module.storage.iceberg_catalog
+}
+
+output "steward_dataset_id" {
+  value = module.bq_ops.steward_dataset_id
+}
+
+output "mpi_eval_dataset_id" {
+  value = module.bq_ops.mpi_eval_dataset_id
 }

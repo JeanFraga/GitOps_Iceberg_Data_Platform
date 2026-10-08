@@ -9,6 +9,6 @@ variable "region" {
 }
 
 variable "runtime_member" {
-  description = "IAM member of the runtime SA (create + read on landing, no delete)"
+  description = "IAM member of the runtime SA (create + read on landing, no delete; objectAdmin on warehouse)"
   type        = string
 }

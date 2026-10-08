@@ -1,0 +1,26 @@
+[
+  {
+    "name": "generator_seed",
+    "type": "INT64",
+    "mode": "REQUIRED",
+    "description": "Synthetic generator seed"
+  },
+  {
+    "name": "source_record_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Source record id"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Source system"
+  },
+  {
+    "name": "person_truth",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "True person identity"
+  }
+]

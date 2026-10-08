@@ -1,0 +1,50 @@
+[
+  {
+    "name": "event_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique event id"
+  },
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run identity"
+  },
+  {
+    "name": "task",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Task within the run"
+  },
+  {
+    "name": "event",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Event name (started, mpi_complete, finished, ...)"
+  },
+  {
+    "name": "executor",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Executor that emitted the event"
+  },
+  {
+    "name": "dataproc_run_seq",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Dataproc run counter"
+  },
+  {
+    "name": "detail",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Event detail"
+  },
+  {
+    "name": "event_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the event occurred"
+  }
+]

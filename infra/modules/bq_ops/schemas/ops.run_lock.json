@@ -1,0 +1,26 @@
+[
+  {
+    "name": "lock_key",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Lock name"
+  },
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Run holding the lock"
+  },
+  {
+    "name": "acquired_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the lock was acquired"
+  },
+  {
+    "name": "expires_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the lock lapses"
+  }
+]

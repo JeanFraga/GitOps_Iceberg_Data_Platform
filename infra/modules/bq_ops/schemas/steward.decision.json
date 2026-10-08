@@ -1,0 +1,62 @@
+[
+  {
+    "name": "decision_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Decision id"
+  },
+  {
+    "name": "pair_hk",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Hash key of the record pair"
+  },
+  {
+    "name": "decision",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Steward decision"
+  },
+  {
+    "name": "scores_at_decision",
+    "type": "JSON",
+    "mode": "REQUIRED",
+    "description": "Scores shown at decision time"
+  },
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Model version at decision time"
+  },
+  {
+    "name": "reason",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Steward reason"
+  },
+  {
+    "name": "os_user",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "OS user who decided"
+  },
+  {
+    "name": "host",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Host the decision was made on"
+  },
+  {
+    "name": "decided_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "When the decision was made"
+  },
+  {
+    "name": "supersedes",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "decision_id this decision supersedes"
+  }
+]
