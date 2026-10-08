@@ -7,7 +7,7 @@ from __future__ import annotations
 import random
 from datetime import timedelta
 
-from datagen import claims837, x12
+from datagen import claims837, noise, x12
 from datagen.claims837 import ERAS, RECEIVER, SOURCE, _d8
 from datagen.registry import DataFile, Feed, FeedOutput
 
@@ -88,7 +88,7 @@ def generate(ctx) -> FeedOutput:
                     ]
                     for i, r in enumerate(chunk, 1):
                         c = r["claim"]
-                        p = c["person"]
+                        p = noise.view(ctx, SOURCE, c["member_id"], c["person"], None)
                         co = round(r["charge"] - r["allowed"], 2)
                         body += [
                             s("LX", str(i)),

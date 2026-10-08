@@ -8,13 +8,14 @@ from __future__ import annotations
 import json
 import random
 
-from datagen import claims837
+from datagen import claims837, noise
 from datagen.registry import DataFile, FeedOutput
 
 SOURCE = "emr_facility_1"
 ERA = "F1"
 NPI_SYSTEM = "http://hl7.org/fhir/sid/us-npi"
 MRN_SYSTEM = "urn:emr-facility-1:mrn"
+SSN_SYSTEM = "http://hl7.org/fhir/sid/us-ssn"
 VISIT_SYSTEM = "urn:emr-facility-1:visit"
 ACT_CODE = "http://terminology.hl7.org/CodeSystem/v3-ActCode"
 FEEDS = ("patient", "practitioner", "organization", "encounter")
@@ -61,13 +62,17 @@ def _generate(ctx) -> dict[str, FeedOutput]:
         pid = mrn(person.person_id)
         person_of[pid] = person.person_id
         if pid not in patients:
-            a = address[person.person_id]
+            v = noise.view(ctx, SOURCE, pid, person, address[person.person_id])
+            a = v.address
+            ids = [{"system": MRN_SYSTEM, "value": pid}]
+            if v.ssn:
+                ids.append({"system": SSN_SYSTEM, "value": v.ssn})
             patients[pid] = _resource(
                 "Patient", pid, tok,
-                identifier=[{"system": MRN_SYSTEM, "value": pid}],
-                name=[{"family": person.last_name, "given": [person.first_name]}],
-                gender="male" if person.sex == "M" else "female",
-                birthDate=person.dob.isoformat(),
+                identifier=ids,
+                name=[{"family": v.last_name, "given": [v.first_name]}],
+                gender="male" if v.sex == "M" else "female",
+                birthDate=v.dob.isoformat(),
                 address=[{"line": [a.line1], "city": a.city, "state": a.state, "postalCode": a.zip}],
             )  # fmt: skip
         npi, idx = f["other"]
@@ -105,6 +110,12 @@ def _generate(ctx) -> dict[str, FeedOutput]:
     ):
         out[feed] = FeedOutput(files=[DataFile(f"{SOURCE}_{feed}_{ERA}.ndjson", _ndjson(res), len(res), era=ERA)])
     out["patient"].person_truth = [
-        {"source": SOURCE, "source_record_id": k, "person_truth": v} for k, v in sorted(person_of.items())
+        {
+            "source": SOURCE,
+            "source_record_id": k,
+            "person_truth": v,
+            "noise_type": ctx.cache["noise_views"][(SOURCE, k)].noise_type,
+        }
+        for k, v in sorted(person_of.items())
     ]
     return out

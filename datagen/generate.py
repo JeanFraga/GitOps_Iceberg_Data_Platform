@@ -8,7 +8,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from datagen import population, registry
+from datagen import noise, population, registry
 
 OUT = Path(__file__).resolve().parent / "out"
 BASE_YEAR = 2024
@@ -21,6 +21,9 @@ class Context:
     volume_name: str
     volume: dict
     token: str
+    edge_case_rate: float = 0.02
+    scenarios: tuple[str, ...] = tuple(noise.SCENARIOS)
+    run: str = "train"
     cache: dict = field(default_factory=dict, repr=False)
     _built: dict[int, tuple[population.Household, ...]] = field(default_factory=dict, repr=False)
 
@@ -68,6 +71,8 @@ def generate(ctx: Context, out: Path = OUT, feeds: list[registry.Feed] | None = 
             truth[t] += getattr(result, t)
     for hh in (hh for built in ctx._built.values() for hh in built):
         names.update(f"{p.first_name} {p.last_name}" for p in hh.members)
+    names.update(ctx.cache.get("noise_names", ()))
+    present = sorted({r["noise_type"] for r in truth["person_truth"] if r.get("noise_type")})
     (out / "ground_truth").mkdir(parents=True, exist_ok=True)
     for t, rows in truth.items():
         (out / "ground_truth" / f"{t}.jsonl").write_bytes(_jsonl(rows, ctx.token, ctx.seed))
@@ -75,6 +80,9 @@ def generate(ctx: Context, out: Path = OUT, feeds: list[registry.Feed] | None = 
         "_synthetic": ctx.token,
         "seed": ctx.seed,
         "volume_profile": ctx.volume_name,
+        "run": ctx.run,
+        "edge_case_rate": ctx.edge_case_rate,
+        "noise_scenarios": present,
         "files": sorted(files, key=lambda f: f["path"]),
         "schema_drift": [],
         "data_drift": [],

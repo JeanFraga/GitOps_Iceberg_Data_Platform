@@ -9,6 +9,10 @@ budget:
 cost:
   max_bytes_billed: 10737418240
 datagen:
+  edge_case_rate: 0.02
+  eval_only_scenarios:
+  - twin
+  - cross_payer_switch
   eval_seed: 20261009
   seed: 20261008
   volume_profile: ci

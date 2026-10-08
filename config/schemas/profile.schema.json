@@ -156,6 +156,17 @@
         "eval_seed": {
           "type": "integer"
         },
+        "edge_case_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "eval_only_scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "volume_profile": {
           "enum": [
             "ci",

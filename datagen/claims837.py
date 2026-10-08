@@ -9,7 +9,7 @@ import random
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from datagen import x12
+from datagen import noise, x12
 from datagen.npi import generate_npi
 from datagen.population import Person
 from datagen.registry import DataFile, FeedOutput
@@ -176,7 +176,7 @@ def _generate(ctx, kind: str) -> tuple[FeedOutput, list[dict]]:
             member_id = payer_a_member_id(c["person"])
             members[member_id] = c["person"].person_id
             amt = sum(a for _, a in c["lines"])
-            body, latest = _claim(rng, kind, c_id, c["freq"], c["original"], c["person"], member_id,
+            body, latest = _claim(rng, kind, c_id, c["freq"], c["original"], noise.view(ctx, SOURCE, member_id, c["person"], None), member_id,
                           c["billing"], c["other"], c["svc"], c["lines"], amt, hi)  # fmt: skip
             txs.append((latest, body))
             facts.append({"era": era.name, "kind": kind, "claim_id": c_id, "freq": c["freq"],
@@ -204,6 +204,12 @@ def _generate(ctx, kind: str) -> tuple[FeedOutput, list[dict]]:
             ic.add(body)
         out.files.append(DataFile(f"payer_a_837{kind.lower()}_{era.name}.837", ic.render(), len(txs), era=era.name))
     out.person_truth = [
-        {"source": SOURCE, "source_record_id": m, "person_truth": pid} for m, pid in sorted(members.items())
+        {
+            "source": SOURCE,
+            "source_record_id": m,
+            "person_truth": pid,
+            "noise_type": ctx.cache["noise_views"][(SOURCE, m)].noise_type,
+        }
+        for m, pid in sorted(members.items())
     ]
     return out, facts

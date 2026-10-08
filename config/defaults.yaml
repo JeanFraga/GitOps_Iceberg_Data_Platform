@@ -20,6 +20,8 @@ run:
 datagen:
   seed: 20261008
   eval_seed: 20261009
+  edge_case_rate: 0.02
+  eval_only_scenarios: [twin, cross_payer_switch]
   volume_profile: ci
   volume_profiles:
     ci: {records_per_file: 5000, years: 1}

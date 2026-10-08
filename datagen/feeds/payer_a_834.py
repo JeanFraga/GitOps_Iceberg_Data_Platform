@@ -8,7 +8,7 @@ from __future__ import annotations
 import random
 from datetime import date, timedelta
 
-from datagen import x12
+from datagen import noise, x12
 from datagen.claims837 import RECEIVER, SOURCE, _d8, payer_a_member_id
 from datagen.registry import DataFile, Feed, FeedOutput
 
@@ -63,7 +63,10 @@ def generate(ctx) -> FeedOutput:
         count += len(hh.members)
         for p in hh.members:
             mid = payer_a_member_id(p)
-            out.person_truth.append({"source": SOURCE, "source_record_id": mid, "person_truth": p.person_id})
+            v = noise.view(ctx, SOURCE, mid, p, None)
+            out.person_truth.append(
+                {"source": SOURCE, "source_record_id": mid, "person_truth": p.person_id, "noise_type": v.noise_type}
+            )
             spans, move = _timeline(rng, months)
             addr = (hh.address.line1, hh.address.city, hh.address.state, hh.address.zip)
             new_addr = (
@@ -73,7 +76,7 @@ def generate(ctx) -> FeedOutput:
                 f"{(int(hh.address.zip) + rng.randint(1, 99)) % 100000:05d}",
             )
 
-            def member(code: str, reason: str, at: tuple, tail: list[str], p=p, mid=mid) -> list[str]:
+            def member(code: str, reason: str, at: tuple, tail: list[str], p=v, mid=mid) -> list[str]:
                 return [
                     s("INS", "Y", "18", code, reason, "A", "", "", "FT"),
                     s("REF", "0F", mid),

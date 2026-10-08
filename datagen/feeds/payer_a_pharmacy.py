@@ -7,6 +7,7 @@ import io
 import random
 from datetime import date, timedelta
 
+from datagen import noise
 from datagen.claims837 import RECEIVER, SOURCE, payer_a_member_id
 from datagen.ndc import FORMS, generate_ndc
 from datagen.npi import generate_npi
@@ -68,6 +69,7 @@ def generate(ctx) -> FeedOutput:
             rx = f"{rx_seq:07d}"
             first = start + timedelta(days=rng.randrange(days + 1))
             member = payer_a_member_id(p)
+            v = noise.view(ctx, SOURCE, member, p, None)
             for k in range(fills):
                 dos = first + timedelta(days=k * supply)
                 if dos.year != year:
@@ -79,7 +81,7 @@ def generate(ctx) -> FeedOutput:
                 rows.append(
                     [
                         RECEIVER, rx, k, "01", pharm_npi, ncpdp, prescriber, member,
-                        p.first_name, p.last_name, p.dob.strftime("%Y%m%d"), "1" if p.sex == "M" else "2",
+                        v.first_name, v.last_name, v.dob.strftime("%Y%m%d"), "1" if v.sex == "M" else "2",
                         dos.strftime("%Y%m%d"), ndc, name, qty, supply,
                         _money(ingredient), _money(fee), _money(copay), _money(total), "P",
                     ]
@@ -93,7 +95,8 @@ def generate(ctx) -> FeedOutput:
         writer.writerows(rows)
         out.files.append(DataFile(f"payer_a_pharmacy_{year}.csv", buf.getvalue().encode(), len(rows)))
     for member, pid in sorted(emitted.items()):
-        out.person_truth.append({"source": SOURCE, "source_record_id": member, "person_truth": pid})
+        nt = ctx.cache["noise_views"][(SOURCE, member)].noise_type
+        out.person_truth.append({"source": SOURCE, "source_record_id": member, "person_truth": pid, "noise_type": nt})
     return out
 
 
