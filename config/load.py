@@ -1,6 +1,6 @@
 """Resolve platform config: defaults deep-merged with a profile, plus versions.yaml.
 
-Usage: python config/load.py [--profile demo] [--validate-only | --check]
+Usage: python config/load.py [--profile demo] [--validate-only | --check | --check-bytes-cap]
 Writes config/resolved.yaml. Deep-merge logic lives only here. The `versions` key
 comes only from the repo-root versions.yaml and replaces any `versions` key in
 defaults or the profile.
@@ -41,7 +41,7 @@ def _read(path: Path) -> dict:
 
 def resolve(profile: str, config_dir: Path = CONFIG_DIR) -> dict:
     """Defaults deep-merged with the profile, plus the versions.yaml pins under `versions`."""
-    profile_path = config_dir / "profiles" / f"{profile}.yaml"
+    profile_path = _profile_path(profile, config_dir)
     if not profile_path.is_file():
         raise FileNotFoundError(f"profile not found: {profile} ({profile_path})")
     resolved = deep_merge(_read(config_dir / "defaults.yaml"), _read(profile_path))
@@ -49,6 +49,13 @@ def resolve(profile: str, config_dir: Path = CONFIG_DIR) -> dict:
     if versions_file.is_file():
         resolved["versions"] = _read(versions_file)
     return resolved
+
+
+def _profile_path(profile: str, config_dir: Path) -> Path:
+    """A profile name under profiles/, or a path to a profile yaml (lint fixtures)."""
+    if profile.endswith((".yaml", ".yml")):
+        return Path(profile)
+    return config_dir / "profiles" / f"{profile}.yaml"
 
 
 class ConfigError(Exception):
@@ -85,6 +92,13 @@ def validate_standards(config_dir: Path = CONFIG_DIR) -> None:
         raise ConfigError("lifecycle.yaml violations:\n  " + "\n  ".join(errors))
 
 
+def check_bytes_cap(profile: str, config_dir: Path = CONFIG_DIR) -> None:
+    """AD-16: the resolved profile must set a positive cost.max_bytes_billed."""
+    cap = (resolve(profile, config_dir).get("cost") or {}).get("max_bytes_billed")
+    if isinstance(cap, bool) or not isinstance(cap, int) or cap <= 0:
+        raise ConfigError(f"profile {profile}: cost.max_bytes_billed must be a positive integer (got {cap!r})")
+
+
 def render(profile: str, config_dir: Path = CONFIG_DIR) -> str:
     """Validated resolved.yaml text for a profile."""
     resolved = resolve(profile, config_dir)
@@ -117,12 +131,16 @@ def main(argv: list[str] | None = None, config_dir: Path = CONFIG_DIR) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--validate-only", action="store_true", help="validate defaults and the profile; write nothing")
     mode.add_argument("--check", action="store_true", help="exit 1 if config/resolved.yaml is stale or hand-edited")
+    mode.add_argument("--check-bytes-cap", action="store_true", help="exit 1 if the profile sets no bytes-billed cap")
     args = parser.parse_args(argv)
     try:
         if args.validate_only:
             render(args.profile, config_dir)
             validate_standards(config_dir)
             print(f"ok: profile {args.profile}")
+        elif args.check_bytes_cap:
+            check_bytes_cap(args.profile, config_dir)
+            print(f"ok: profile {args.profile} sets cost.max_bytes_billed")
         elif args.check:
             if is_stale(args.profile, config_dir):
                 print("error: config/resolved.yaml is stale or hand-edited; run `make resolve`", file=sys.stderr)

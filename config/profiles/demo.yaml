@@ -1,3 +1,7 @@
 profile: demo
 project_id: gitops-iceberg-data-platform
 region: us-east1
+billing_account: 016257-CB508D-E7A17B
+# AD-16: every engine caps bytes billed; `make lint-bytes-cap` fails without it.
+cost:
+  max_bytes_billed: 10737418240

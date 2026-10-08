@@ -11,7 +11,9 @@
     "region",
     "flags",
     "versions",
-    "drift"
+    "drift",
+    "billing_account",
+    "budget"
   ],
   "properties": {
     "profile": {
@@ -81,6 +83,44 @@
             "report_only",
             "block"
           ]
+        }
+      }
+    },
+    "billing_account": {
+      "type": "string",
+      "pattern": "^[0-9A-F]{6}-[0-9A-F]{6}-[0-9A-F]{6}$"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_usd",
+        "alert_thresholds"
+      ],
+      "properties": {
+        "amount_usd": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "alert_thresholds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "cost": {
+      "description": "AD-16 bytes-billed cap. Not required here: `make lint-bytes-cap` is the gate.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_bytes_billed": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }

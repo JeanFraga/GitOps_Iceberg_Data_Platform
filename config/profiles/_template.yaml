@@ -3,3 +3,7 @@
 profile: _template
 project_id: client-project-id
 region: us-central1
+billing_account: 000000-000000-000000
+# AD-16: every engine caps bytes billed; `make lint-bytes-cap` fails without it.
+cost:
+  max_bytes_billed: 10737418240

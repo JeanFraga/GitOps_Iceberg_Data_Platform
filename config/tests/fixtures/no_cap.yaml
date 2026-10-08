@@ -1,0 +1,5 @@
+# Lint fixture: a complete profile with no cost.max_bytes_billed.
+profile: no_cap
+project_id: client-project-id
+region: us-central1
+billing_account: 000000-000000-000000

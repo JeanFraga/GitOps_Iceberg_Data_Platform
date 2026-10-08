@@ -11,6 +11,9 @@ resolve: ## Resolve config (defaults + PROFILE + versions.yaml) into config/reso
 validate-config: ## Validate defaults and every profile (demo, _template) against the JSON Schema
 	@for p in demo _template; do uv run python config/load.py --profile $$p --validate-only || exit 1; done
 
+lint-bytes-cap: ## AD-16: fail when PROFILE (name or yaml path) sets no cost.max_bytes_billed
+	uv run python config/load.py --profile $(PROFILE) --check-bytes-cap
+
 check-resolved: ## Fail if config/resolved.yaml is stale or hand-edited (CI calls this)
 	uv run python config/load.py --profile $(PROFILE) --check
 
@@ -48,11 +51,22 @@ TF_DIR := infra/environments/demo
 # Identities stay out of git: impersonators default to the active gcloud account.
 TF_VAR_impersonators ?= ["user:$(shell gcloud config get account 2>/dev/null)"]
 export TF_VAR_impersonators
-DEPLOY_SA = deploy-sa@$(shell uv run python -c "import yaml;print(yaml.safe_load(open('config/resolved.yaml'))['project_id'])").iam.gserviceaccount.com
+PROJECT_ID = $(shell uv run python -c "import yaml;print(yaml.safe_load(open('config/resolved.yaml'))['project_id'])")
+DEPLOY_SA = deploy-sa@$(PROJECT_ID).iam.gserviceaccount.com
 
-tf-bootstrap: resolve ## First apply as the owner (creates the deploy SA); later applies use tf-apply
+apply: resolve ## Apply as the owner (first apply, and after teardown recreates the deploy SA)
 	terraform -chdir=$(TF_DIR) init -input=false
 	terraform -chdir=$(TF_DIR) apply -auto-approve -input=false
+
+tf-bootstrap: apply ## Alias of apply (first apply as the owner); later applies may use tf-apply
+
+teardown: resolve ## Destroy everything Terraform manages; the out-of-band state bucket survives
+	terraform -chdir=$(TF_DIR) init -input=false
+	terraform -chdir=$(TF_DIR) destroy -auto-approve -input=false
+	gcloud storage ls gs://$(PROJECT_ID)-tfstate > /dev/null && echo "state bucket gs://$(PROJECT_ID)-tfstate intact"
+
+budget: resolve ## AD-16: USD budget with alert thresholds on the profile's billing account (owner creds)
+	bash tools/budget.sh
 
 tf-plan: ## Terraform plan impersonating the deploy SA
 	GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=$(DEPLOY_SA) terraform -chdir=$(TF_DIR) plan -input=false
@@ -67,6 +81,6 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 		echo "tflint not installed; skipping"; \
 	fi
 
-validate: lint test validate-config check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
+validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: help upgrade tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

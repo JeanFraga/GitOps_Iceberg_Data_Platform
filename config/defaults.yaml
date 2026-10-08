@@ -9,3 +9,7 @@ flags:
 drift:
   data_drift_thresholds: null
   mode: report_only
+# AD-16: budget alerts only (no cap enforcement), created by `make budget`.
+budget:
+  amount_usd: 5
+  alert_thresholds: [0.5, 0.9, 1.0]

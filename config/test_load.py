@@ -19,8 +19,12 @@ VALID_DEFAULTS = (
     "flags:\n  workflows_enabled: false\n  composer_enabled: false\n"
     "  dataproc_schedule_enabled: false\n  ml_fallback_enabled: true\n"
     "drift:\n  data_drift_thresholds: null\n  mode: report_only\n"
+    "budget:\n  amount_usd: 5\n  alert_thresholds: [0.5, 0.9, 1.0]\n"
 )
-VALID_PROFILE = "profile: demo\nproject_id: demo-project-1\nregion: us-east1\n"
+VALID_PROFILE = (
+    "profile: demo\nproject_id: demo-project-1\nregion: us-east1\n"
+    "billing_account: 000000-000000-000000\ncost:\n  max_bytes_billed: 1000\n"
+)
 
 
 def _contract(tmp_path, defaults=VALID_DEFAULTS, profile=VALID_PROFILE):
@@ -39,7 +43,9 @@ def test_happy_path_writes_deterministic_resolved(tmp_path):
     first = out.read_text()
     assert first.startswith("# GENERATED")
     body = first.splitlines()[1:]
-    assert body[0] == "drift:" and body[1] == "  data_drift_thresholds: null"
+    top = [line.split(":")[0] for line in body if line and not line.startswith(" ")]
+    assert top == sorted(top)
+    assert body[body.index("drift:") + 1] == "  data_drift_thresholds: null"
     load.write_resolved("demo", d)
     assert out.read_text() == first
 
@@ -128,3 +134,20 @@ def test_unknown_lifecycle_state_fails_validation(tmp_path, capsys):
     path.write_text(path.read_text().replace("  - quarantined\n", "  - archived\n", 1))
     assert load.main(["--profile", "demo", "--validate-only"], d) == 1
     assert "lifecycle.yaml" in capsys.readouterr().err
+
+
+def test_bytes_cap_set_passes(tmp_path):
+    d = _contract(tmp_path)
+    assert load.main(["--profile", "demo", "--check-bytes-cap"], d) == 0
+
+
+def test_bytes_cap_missing_fixture_fails(capsys):
+    fixture = REPO_CONFIG / "tests" / "fixtures" / "no_cap.yaml"
+    assert load.main(["--profile", str(fixture), "--check-bytes-cap"]) == 1
+    err = capsys.readouterr().err
+    assert "no_cap.yaml" in err and "cost.max_bytes_billed" in err
+
+
+def test_bytes_cap_zero_fails(tmp_path):
+    d = _contract(tmp_path, profile=VALID_PROFILE.replace("1000", "0"))
+    assert load.main(["--profile", "demo", "--check-bytes-cap"], d) == 1
