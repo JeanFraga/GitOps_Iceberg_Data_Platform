@@ -79,6 +79,14 @@ def _split_x12(data: bytes) -> list[Record]:
     return [Record(i, s) for i, s in enumerate((s for s in segs if s), start=1)]
 
 
+def _blank(raw: bytes) -> bool:
+    """Blank as config/fingerprint.py sees it (str.strip after UTF-8 decode); undecodable is never blank."""
+    try:
+        return not raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return False
+
+
 def split(data: bytes, file_format: str) -> list[Record]:
     """Split BOM-stripped bytes into records per records.yaml."""
     spec = rules()["formats"][file_format]
@@ -87,5 +95,5 @@ def split(data: bytes, file_format: str) -> list[Record]:
         return _split_x12(data)
     out = _split_lf(data, quoted=spec["quoting"] == "rfc4180")
     if spec.get("skip_blank"):
-        out = [r for r in out if r.raw.strip()]
+        out = [r for r in out if not _blank(r.raw)]
     return out

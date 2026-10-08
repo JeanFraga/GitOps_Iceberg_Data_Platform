@@ -3,14 +3,14 @@ title: 'Every sample format into Bronze: NDJSON and X12'
 type: 'feature'
 ticket: '5'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '128b3e3e64dcfa58da6ba546ef2f56e955ae3b00'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -87,6 +87,27 @@ deferred: []
 - Given a fresh table suffix, when each committed NDJSON and X12 sample is loaded, then each file's latest lifecycle state is `reconciled` and the Bronze rows for its `_run_id` equal `len(records.split(file))` (minus the CSV marker line).
 - Given a payer_a 834 sample, when it is loaded, then it routes to `era_2024` or `era_2024_v2` and never to `unmapped_*`.
 - Given the existing CSV tests, when the suite runs, then they still pass unchanged.
+
+### 2026-10-08 — Review pass
+- verdicts: 8 findings — high 0, medium 1, low 3, false 3, maybe-false 0 (1 informational)
+- findings:
+  - `medium` `patch` A non-UTF-8 byte outside a JSON string broke the jsonl fingerprint and failed the file. Fixed: the fingerprint text is built from decodable records only; load-level test added.
+  - `low` `patch` Unit-only coverage of the blank and non-UTF-8 matrix rows. Added cli.load local-Spark tests asserting loader count == gate count and reconciled.
+  - `low` `patch` Blank-line rule disagreed with fingerprint (ASCII vs Unicode strip). Fixed: `_blank` decodes then uses str.strip().
+  - `false` `reject` Backtick-quoted ident in fast_forward. The live demo load of `835__a1_s35` fast-forwarded and reached reconciled.
+  - `low` `reject` ISA not UTF-8 garbles segment_id. Synthetic-only edge case; the guard would add branching.
+  - `false` `reject` AC1 evidence missing. The live _s35 runs reconciled with count == split for NDJSON and 835, per the plan's stated live check.
+  - `false` `reject` AC3 tests edited. Only the non-CSV refusal tests changed, as the behavior change requires; the CSV tests are unchanged.
+  - `false` `reject` No agent instruction files exist (informational).
+
+## Auto Run Result
+
+- Summary: the loader handles NDJSON (one `record` column) and X12 (segment_id plus segment, ISA16 split, segment ordinal), routes by the jsonl/x12 fingerprint, and reconciles per format. Blank NDJSON lines are skipped with physical ordinals.
+- Files: ingestion/__main__.py, ingestion/bronze.py, ingestion/records.py, config/standards/records.yaml, ingestion/tests/test_formats.py, adjusted refusal tests.
+- Review: 3 patched (1 medium, 2 low), 0 deferred, 5 rejected.
+- Follow-up review recommended: false.
+- Verification: pytest ingestion pipeline config datagen gave 288 passed. make validate passed. Live demo: patient_F1.ndjson gave 17073 rows and 835_p_A1 gave 183304 rows into the _s35 tables, both reconciled.
+- Residual risk: the full demo batch still exits 3 (unmarked.csv) and 9 CSVs are wrongly quarantined; both are carried from 3.4. The IAM grant is still unapplied.
 
 ## Design Notes
 

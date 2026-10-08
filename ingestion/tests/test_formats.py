@@ -131,6 +131,8 @@ VERSIONS = yaml.safe_load((SAMPLES.parents[1] / "versions.yaml").read_text())
 CASES = {
     "jsonl": ("emr_facility_1", "patient", NDJSON, "patient__f1"),
     "x12": ("payer_a", "835", X12, "835__a1"),
+    "jsonl_blank": ("emr_facility_1", "patient", None, "patient__f1"),
+    "jsonl_badbyte": ("emr_facility_1", "patient", None, "patient__f1"),
     "x12_834": ("payer_a", "834", SAMPLES / "payer_a/834/payer_a_834_full_20240101.834", None),
 }
 
@@ -159,17 +161,23 @@ def env(monkeypatch, spark, request):
     monkeypatch.setattr(cli.bronze, "build_session", lambda *a: spark)
     monkeypatch.setattr(cli, "bq_count", lambda p, c, ref, run: {
         "rows": spark.table(ident_of(ref)).where(f"_run_id = '{run}'").count(), "min_ordinal": 1})  # fmt: skip
-    data = path.read_bytes()
-    _sha, u = uri(source, feed, data, path.name)
+    lines = NDJSON.read_bytes().split(b"\n")
+    if request.param == "jsonl_blank":
+        data, name = b"\n".join([lines[0], b"", b"\r", "\u2003".encode(), *lines[1:4]]) + b"\n", "b.ndjson"
+    elif request.param == "jsonl_badbyte":
+        data, name = b"\n".join([lines[0], b'{"id":1}\xff', *lines[1:4]]) + b"\n", "c.ndjson"
+    else:
+        data, name = path.read_bytes(), path.name
+    _sha, u = uri(source, feed, data, name)
     monkeypatch.setattr(cli, "_gcloud", fake_gcloud(data))
     return spark, data, u, request.param
 
 
 @java
-@pytest.mark.parametrize("env", ["jsonl", "x12", "x12_834"], indirect=True)
+@pytest.mark.parametrize("env", ["jsonl", "x12", "x12_834", "jsonl_blank", "jsonl_badbyte"], indirect=True)
 def test_wap_reconciles_and_counts_equal_split(monkeypatch, env):
     spark, data, u, case = env
-    fmt = "jsonl" if case == "jsonl" else "x12"
+    fmt = "jsonl" if case.startswith("jsonl") else "x12"
     ops = FakeOps().install(monkeypatch)
     out = cli.load({**CFG, "versions": VERSIONS}, u, "r1")
     assert ops.states == ["landed", "bronze_appended", "reconciled"]
@@ -197,3 +205,19 @@ def test_tamper_drops_a_branch_row_quarantines(monkeypatch, env):
     assert [q["reason"] for q in ops.quarantine] == ["RECONCILE_FAIL"]
     ident = ident_of("p.w." + ops.lifecycle[-1]["detail"]["table"])
     assert bronze.main_history_len(spark, ident) == 0 and spark.table(ident).count() == 0
+
+
+@java
+@pytest.mark.parametrize("env", ["jsonl_blank", "jsonl_badbyte"], indirect=True)
+def test_blank_and_non_utf8_ndjson_through_load(monkeypatch, env):
+    spark, _data, u, case = env
+    ops = FakeOps().install(monkeypatch)
+    out = cli.load({**CFG, "versions": VERSIONS}, u, "r1")
+    d = ops.lifecycle[-1]["detail"]
+    assert ops.states[-1] == "reconciled" and d["expected"] == d["actual"] == out["rows"] == 5 - (case == "jsonl_blank")
+    got = spark.table(ident_of("p.w." + out["table"])).where("_run_id = 'r1'")
+    if case == "jsonl_blank":
+        assert sorted(r[0] for r in got.select("_line_ordinal").collect()) == [1, 5, 6, 7]
+    else:
+        bad = got.where("_line_ordinal = 2").first()
+        assert bad["_raw_encoding"] == "base64" and bad["record"] is None

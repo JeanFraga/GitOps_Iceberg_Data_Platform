@@ -27,7 +27,7 @@ from config.fingerprint import LAYOUTS, fingerprint, fp8
 from ingestion import bronze, discover, drift, eras, land, lifecycle, reconcile
 from ingestion.discover import URI_RE
 from ingestion.marker import UnmarkedFile, check_marker, drop_marker_line
-from ingestion.records import split, strip_bom
+from ingestion.records import split
 from pipeline import runner
 
 RESOLVED = Path(__file__).resolve().parent.parent / "config" / "resolved.yaml"
@@ -128,7 +128,9 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
         records = drop_marker_line(records)
         text = "\n".join(r.raw.decode("utf-8", errors="replace") for r in records[:1])
     else:
-        text = strip_bom(data).decode("utf-8", errors="replace")
+        # Only records that decode as UTF-8: a bad byte would become U+FFFD and break jsonl_layout's JSON
+        # parse; that record still loads (base64 in _raw_line).
+        text = "\n".join(r.raw.decode("utf-8") for r in records if r.encoding == "utf-8")
     fp = fingerprint(text, fmt)
     route = eras.resolve(source, feed, fp, LAYOUTS[fmt](text))
     namespace, table = f"bronze_{source}", f"{feed}__{route.era}{table_suffix}"
