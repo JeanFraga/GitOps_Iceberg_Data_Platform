@@ -62,8 +62,11 @@ def test_manifest_shape_and_sha(out):
     assert [p for p in paths if not p.endswith(".834")] == [
         *(f"landing/payer_a/835/payer_a_835_{k}_{e}.835" for k in "dip" for e in ("A1", "A2")),
         *(f"landing/payer_a/837{k}/payer_a_837{k}_{e}.837" for k in "dip" for e in ("A1", "A2")),
+        "landing/payer_a/pharmacy/payer_a_pharmacy_2024.csv",
+        "landing/payer_a/pharmacy/payer_a_pharmacy_2025.csv",
         "landing/payer_b/members/payer_b_members_2024.csv",
         "landing/payer_b/members/payer_b_members_2025.csv",
+        "landing/provider_directory/providers/providers.csv",
     ]
     for f in m["files"]:
         assert f["sha256"] == hashlib.sha256((out / f["path"]).read_bytes()).hexdigest()
