@@ -49,3 +49,39 @@ def record(
     )
     args = bq_query_args(project_id, max_bytes_billed) + [f"--parameter={k}:STRING:{v}" for k, v in params.items()]
     run([*args, sql], check=True, capture_output=True, text=True)
+
+
+def latest_states(
+    *, project_id: str, max_bytes_billed: int, file_sha256: str, run: Runner = subprocess.run
+) -> list[dict]:
+    """[{state, table, branch}] recorded for one file, oldest first. `table` is detail.table (Bronze states only)."""
+    sql = (f"SELECT state, JSON_VALUE(detail, '$.table') AS table, "
+           f"JSON_VALUE(detail, '$.branch') AS branch FROM `{project_id}.ops.file_lifecycle` "
+           "WHERE file_sha256 = @sha ORDER BY recorded_at")  # fmt: skip
+    args = [*bq_query_args(project_id, max_bytes_billed), "--format=json", f"--parameter=sha:STRING:{file_sha256}"]
+    out = run([*args, sql], check=True, capture_output=True, text=True).stdout
+    rows = json.loads(out) if out.lstrip().startswith("[") else []
+    return [{"state": r["state"], "table": r.get("table"), "branch": r.get("branch")} for r in rows]
+
+
+def quarantine(
+    *,
+    project_id: str,
+    max_bytes_billed: int,
+    file_sha256: str,
+    reason: str,
+    run_id: str,
+    line_ordinal: int | None = None,
+    run: Runner = subprocess.run,
+) -> None:
+    """One ops.quarantine row. raw_line stays NULL: row values never leave Bronze."""
+    params = [f"--parameter=sha:STRING:{file_sha256}", f"--parameter=reason:STRING:{reason}",
+              f"--parameter=run:STRING:{run_id}"]  # fmt: skip
+    if line_ordinal is not None:
+        params.append(f"--parameter=ord:INT64:{int(line_ordinal)}")
+    sql = (
+        f"INSERT INTO `{project_id}.ops.quarantine` "
+        "(file_sha256, line_ordinal, reason, raw_line, run_id, quarantined_at) "
+        f"VALUES (@sha, {'@ord' if line_ordinal is not None else 'NULL'}, @reason, NULL, @run, CURRENT_TIMESTAMP())"
+    )
+    run([*bq_query_args(project_id, max_bytes_billed), *params, sql], check=True, capture_output=True, text=True)

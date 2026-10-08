@@ -1,7 +1,7 @@
-"""Bronze append (AD-4/AD-6): all-STRING columns plus lineage, one Iceberg table per (source, feed, era).
+"""Bronze write-audit-publish (AD-4/AD-6): all-STRING columns plus lineage, one Iceberg table per (source, feed, era).
 
 The SparkSession uses the BigLake Iceberg REST catalog; tests pass a Hadoop catalog instead.
-Only appends: no update, delete or expire_snapshots.
+Only appends to a WAP branch and fast-forwards main: no row rewrites, no snapshot expiry.
 """
 
 from __future__ import annotations
@@ -98,21 +98,81 @@ def build_rows(
     return columns, rows
 
 
-def append(spark, namespace: str, table: str, columns: list[str], rows: list[tuple], run_id: str) -> int:
-    """Create namespace/table if absent (partitioned by days(_ingested_at)) and append. Returns snapshot_id."""
+def ragged_count(records: list[Record]) -> int:
+    """Data records whose CSV field count differs from the header's (still loaded; counted only)."""
+    if not records:
+        return 0
+    width = len(next(csv.reader([records[0].raw.decode("utf-8", errors="replace")])))
+    return sum(
+        len(next(csv.reader([rec.raw.decode("utf-8", errors="replace")], strict=False), [])) != width
+        for rec in records[1:]
+    )
+
+
+def wap_branch(sha256: str) -> str:
+    return f"wap_{sha256[:8]}"
+
+
+def ensure_table(spark, namespace: str, table: str, columns: list[str]) -> str:
+    """Create namespace/table if absent (partitioned by days(_ingested_at)). Returns the identifier."""
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{namespace}")
+    ident = f"{CATALOG}.{namespace}.{table}"
+    ddl = ", ".join([f"`{c}` string" for c in columns] + [f"`{n}` {t}" for n, t in LINEAGE])
+    spark.sql(f"CREATE TABLE IF NOT EXISTS {ident} ({ddl}) USING iceberg PARTITIONED BY (days(_ingested_at))")
+    return ident
+
+
+def main_snapshot_id(spark, ident: str) -> int | None:
+    rows = spark.sql(f"SELECT snapshot_id FROM {ident}.refs WHERE name = 'main'").collect()
+    return int(rows[0]["snapshot_id"]) if rows else None
+
+
+def write_branch(
+    spark, namespace: str, table: str, columns: list[str], rows: list[tuple], run_id: str, sha256: str
+) -> tuple[str, str]:
+    """AD-4 write step: (re)create wap_<sha8> at main's head and append this delivery to it.
+
+    Returns (identifier, branch). Main is not touched.
+    """
     from pyspark.sql.types import LongType, StringType, StructField, StructType, TimestampType
 
     types = {"string": StringType(), "bigint": LongType(), "timestamp": TimestampType()}
     schema = StructType(
         [StructField(c, StringType(), True) for c in columns] + [StructField(n, types[t], True) for n, t in LINEAGE]
     )
+    ident = ensure_table(spark, namespace, table, columns)
+    branch = wap_branch(sha256)
+    # Resets a stale branch from an earlier failed attempt to main's head (or to an empty
+    # snapshot when the table has none yet).
+    if main_snapshot_id(spark, ident) is None:
+        # No main head to replace from: drop a stale branch, then create it (empty snapshot).
+        spark.sql(f"ALTER TABLE {ident} DROP BRANCH IF EXISTS `{branch}`")
+        spark.sql(f"ALTER TABLE {ident} CREATE BRANCH `{branch}`")
+    else:
+        spark.sql(f"ALTER TABLE {ident} CREATE OR REPLACE BRANCH `{branch}`")
     df = spark.createDataFrame(rows, schema)
-    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{namespace}")
-    ident = f"{CATALOG}.{namespace}.{table}"
-    # Explicit CREATE (schema fixed by the header + LINEAGE), then a plain append.
-    ddl = ", ".join([f"`{c}` string" for c in columns] + [f"`{n}` {t}" for n, t in LINEAGE])
-    spark.sql(f"CREATE TABLE IF NOT EXISTS {ident} ({ddl}) USING iceberg PARTITIONED BY (days(_ingested_at))")
-    df.writeTo(ident).option("snapshot-property.run_id", run_id).append()
+    (df.writeTo(f"{ident}.branch_{branch}")
+       .option("snapshot-property.run_id", run_id)
+       .option("snapshot-property.file_sha256", sha256)
+       .append())  # fmt: skip
+    return ident, branch
+
+
+def branch_rows(spark, ident: str, branch: str, run_id: str) -> list[tuple[int, str | None, str | None]]:
+    """(_line_ordinal, _raw_line, _raw_encoding) for this run on the branch. Values stay in memory, never logged."""
+    df = spark.read.option("branch", branch).table(ident)
+    got = df.where(df["_run_id"] == run_id).select("_line_ordinal", "_raw_line", "_raw_encoding").collect()
+    return [(int(r[0]), r[1], r[2]) for r in got]
+
+
+def publish(spark, ident: str, branch: str, run_id: str) -> int:
+    """AD-4 publish: fast-forward main to the WAP branch. Returns the run's snapshot_id."""
+    ns_tbl = ident.split(".", 1)[1]
+    spark.sql(f"CALL {CATALOG}.system.fast_forward('{ns_tbl}', 'main', '{branch}')")
+    return run_snapshot_id(spark, ident, run_id)
+
+
+def run_snapshot_id(spark, ident: str, run_id: str) -> int:
     snap = spark.sql(
         f"SELECT snapshot_id FROM {ident}.snapshots WHERE summary['run_id'] = '{run_id}' "
         "ORDER BY committed_at DESC LIMIT 1"
@@ -120,3 +180,17 @@ def append(spark, namespace: str, table: str, columns: list[str], rows: list[tup
     if not snap:
         raise BronzeError("no snapshot tagged with this run_id")
     return int(snap[0]["snapshot_id"])
+
+
+def published_snapshot(spark, ident: str, sha256: str) -> int | None:
+    """A main-lineage snapshot already tagged with this file_sha256 (a publish whose `reconciled` was lost)."""
+    rows = spark.sql(
+        f"SELECT s.snapshot_id FROM {ident}.snapshots s JOIN {ident}.history h ON s.snapshot_id = h.snapshot_id "
+        f"WHERE h.is_current_ancestor AND s.summary['file_sha256'] = '{sha256}' LIMIT 1"
+    ).collect()
+    return int(rows[0]["snapshot_id"]) if rows else None
+
+
+def main_history_len(spark, ident: str) -> int:
+    """Snapshots reachable from main (the main lineage)."""
+    return spark.sql(f"SELECT count(*) n FROM {ident}.history WHERE is_current_ancestor").collect()[0]["n"]

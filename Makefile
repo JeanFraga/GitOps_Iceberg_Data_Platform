@@ -50,7 +50,7 @@ TRACER_SAMPLE := datagen/samples/payer_b/members/payer_b_members_2024.csv
 
 bronze: resolve ## Load one landed file into Bronze Iceberg (BigLake REST) and ops.file_lifecycle. FILE=gs://... required
 	@test -n "$(FILE)" || { echo "error: FILE=gs://<landing>/source=/feed=/ingest_date=/sha256=/<name> is required"; exit 1; }
-	$(UV) run python -m ingestion --profile $(PROFILE) --file $(FILE)
+	$(UV) run python -m ingestion --profile $(PROFILE) --file $(FILE) $(if $(TABLE_SUFFIX),--table-suffix $(TABLE_SUFFIX))
 
 bronze-tracer-land: resolve ## Land the committed payer_b members sample (no-op if already landed); prints its gs:// URI
 	@sha=$$(sha256sum $(TRACER_SAMPLE) | cut -d' ' -f1); \
