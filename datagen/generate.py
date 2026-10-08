@@ -38,7 +38,7 @@ def _jsonl(rows: list[dict], token: str, seed: int) -> bytes:
     if not rows:
         return (json.dumps({"_synthetic": token}) + "\n").encode()
     full = [{"_synthetic": token, "generator_seed": seed, **r} for r in rows]
-    lines = sorted(json.dumps(r, sort_keys=False) for r in full)
+    lines = sorted({json.dumps(r, sort_keys=False) for r in full})  # feeds may share rows
     return ("\n".join(lines) + "\n").encode()
 
 
@@ -60,6 +60,7 @@ def generate(ctx: Context, out: Path = OUT, feeds: list[registry.Feed] | None = 
                     "feed": feed.feed,
                     "sha256": hashlib.sha256(f.content).hexdigest(),
                     "records": f.records,
+                    **({"era": f.era} if f.era else {}),
                 }
             )
         for t in TRUTH_TABLES:

@@ -16,6 +16,7 @@ class DataFile:
     name: str
     content: bytes
     records: int
+    era: str | None = None
 
 
 @dataclass

@@ -57,6 +57,7 @@ def test_manifest_shape_and_sha(out):
     assert m["_synthetic"] == TOKEN and m["seed"] == 20261008 and m["volume_profile"] == "test"
     assert m["schema_drift"] == [] and m["data_drift"] == []
     assert [f["path"] for f in m["files"]] == [
+        *(f"landing/payer_a/837{k}/payer_a_837{k}_{e}.837" for k in "dip" for e in ("A1", "A2")),
         "landing/payer_b/members/payer_b_members_2024.csv",
         "landing/payer_b/members/payer_b_members_2025.csv",
     ]
@@ -64,12 +65,13 @@ def test_manifest_shape_and_sha(out):
         assert f["sha256"] == hashlib.sha256((out / f["path"]).read_bytes()).hexdigest()
         assert f["records"] <= SMALL["records_per_file"]
     truth = (out / "ground_truth" / "person_truth.jsonl").read_text().splitlines()
-    assert m["files"][0]["records"] == len([r for r in map(json.loads, truth) if len(r) > 1])
+    pb = [f for f in m["files"] if f["source"] == "payer_b"]
+    assert pb[0]["records"] == len([r for r in map(json.loads, truth) if r.get("source") == "payer_b"])
 
 
 def test_csv_members_in_person_truth(out):
     truth = [json.loads(line) for line in (out / "ground_truth" / "person_truth.jsonl").read_text().splitlines()]
-    truth_ids = {r["source_record_id"] for r in truth if len(r) > 1}
+    truth_ids = {r["source_record_id"] for r in truth if r.get("source") == "payer_b"}
     for path in (out / "landing" / "payer_b" / "members").iterdir():
         rows = list(csv.DictReader(path.read_text().splitlines()[1:]))
         assert len(rows) == len(truth_ids) <= SMALL["records_per_file"]
@@ -125,10 +127,11 @@ def test_upload_copies_then_delete_and_load(out):
     upload(CFG, out, run, ingest_date="2026-10-08")
     m = json.loads((out / "manifest.json").read_text())
     cps = [c for c in run.calls if c[:3] == ["gcloud", "storage", "cp"]]
-    assert len(cps) == 2
-    sha = m["files"][0]["sha256"]
-    assert cps[0][3] == "--if-generation-match=0"
-    assert cps[0][5] == (
+    assert len(cps) == len(m["files"]) == 8
+    pb = next(i for i, f in enumerate(m["files"]) if f["source"] == "payer_b")
+    sha = m["files"][pb]["sha256"]
+    assert cps[pb][3] == "--if-generation-match=0"
+    assert cps[pb][5] == (
         f"gs://proj-x-landing/source=payer_b/feed=members/ingest_date=2026-10-08/sha256={sha}/payer_b_members_2024.csv"
     )
     bq = [c for c in run.calls if c[0] == "bq"]
@@ -142,13 +145,13 @@ def test_upload_copies_then_delete_and_load(out):
 def test_upload_skips_landed_sha(out):
     m = json.loads((out / "manifest.json").read_text())
     listing = "".join(
-        f"gs://proj-x-landing/source=payer_b/feed=members/ingest_date=2026-01-01/sha256={f['sha256']}/x.csv\n"
+        f"gs://proj-x-landing/source={f['source']}/feed={f['feed']}/ingest_date=2026-01-01/sha256={f['sha256']}/x.csv\n"
         for f in m["files"]
     )
     run = FakeRun(listing)
     log = upload(CFG, out, run, ingest_date="2026-10-08")
     assert not [c for c in run.calls if c[:3] == ["gcloud", "storage", "cp"]]
-    assert sum("already landed" in line for line in log) == 2
+    assert sum("already landed" in line for line in log) == len(m["files"])
 
 
 def test_upload_without_generate(tmp_path):
