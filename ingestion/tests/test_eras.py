@@ -196,12 +196,12 @@ def test_registry_rebind_then_reload_writes_nothing(monkeypatch):
     assert out["skipped"] == "already_appended" and len(ops.lifecycle) == 2
 
 
-def test_non_csv_is_refused_with_nonzero_exit(monkeypatch, capsys):
+def test_unknown_extension_is_refused_with_nonzero_exit(monkeypatch, capsys):
     cfg = {**CFG, "profile": "demo", "run": {"lock_ttl_minutes": 1}}
     monkeypatch.setattr(cli.yaml, "safe_load", lambda _: cfg)
     monkeypatch.setattr(cli.runner, "BigQueryBackend", lambda *a: cli.runner.FakeBackend())
     monkeypatch.setattr(cli, "_gcloud", lambda args: pytest.fail("object read"))
-    uri = "gs://b/source=payer_a/feed=835/ingest_date=d/sha256=" + "0" * 64 + "/x.835"
+    uri = "gs://b/source=payer_a/feed=835/ingest_date=d/sha256=" + "0" * 64 + "/x.txt"
     assert cli.main(["--profile", "demo", "--file", uri]) == 5
     last = json.loads(capsys.readouterr().err.strip().splitlines()[-1])
     assert last["error_type"] == "UnsupportedFormat"

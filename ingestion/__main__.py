@@ -23,11 +23,11 @@ from pathlib import Path
 
 import yaml
 
-from config.fingerprint import csv_layout, fingerprint, fp8
+from config.fingerprint import LAYOUTS, fingerprint, fp8
 from ingestion import bronze, discover, drift, eras, land, lifecycle, reconcile
 from ingestion.discover import URI_RE
 from ingestion.marker import UnmarkedFile, check_marker, drop_marker_line
-from ingestion.records import split
+from ingestion.records import split, strip_bom
 from pipeline import runner
 
 RESOLVED = Path(__file__).resolve().parent.parent / "config" / "resolved.yaml"
@@ -68,7 +68,16 @@ def report_drift(project: str, cap: int, run_id: str, source: str, feed: str, ro
 
 
 class UnsupportedFormat(Exception):
-    """The landed object is not CSV; X12 and JSONL loading is a later entry."""
+    """The landed object's extension maps to no records.yaml format."""
+
+
+FORMATS = {".csv": "csv", ".ndjson": "jsonl", ".jsonl": "jsonl", ".834": "x12", ".835": "x12", ".837": "x12"}
+
+
+def format_of(uri: str) -> str | None:
+    """records.yaml format from the object's extension, or None when unknown."""
+    name = uri.rsplit("/", 1)[-1].lower()
+    return next((fmt for ext, fmt in FORMATS.items() if name.endswith(ext)), None)
 
 
 class ReconcileFail(Exception):
@@ -82,9 +91,10 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
     if table_suffix and not re.fullmatch(r"_[a-z0-9_]+", table_suffix):
         raise ValueError("table suffix must match _[a-z0-9_]+")
     source, feed, path_sha = m["source"], m["feed"], m["sha"]
-    if not uri.lower().endswith(".csv"):
+    fmt = format_of(uri)
+    if fmt is None:
         log("refused_unsupported_format", object_uri=uri, run_id=run_id)
-        raise UnsupportedFormat("only CSV deliveries are loaded until X12/JSONL routing lands")
+        raise UnsupportedFormat("extension maps to no known format (csv, ndjson/jsonl, 834/835/837)")
     project, cap = cfg["project_id"], cfg["cost"]["max_bytes_billed"]
 
     data = _gcloud(["cat", uri])
@@ -111,11 +121,16 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
         log("rejected_duplicate", object_uri=uri, file_sha256=sha, run_id=run_id)
         return {"run_id": run_id, "skipped": "rejected_duplicate", "object_uri": uri}
 
-    # AD-5: route on the fingerprint of the header (marker line dropped), never on dates or names.
-    records = drop_marker_line(split(data, "csv"))
-    text = "\n".join(r.raw.decode("utf-8", errors="replace") for r in records[:1])
-    fp = fingerprint(text, "csv")
-    route = eras.resolve(source, feed, fp, csv_layout(text))
+    # AD-5: route on the layout fingerprint, never on dates or names. CSV: the header (marker line
+    # dropped); jsonl/x12: the whole file (their markers sit inside records and are kept).
+    records = split(data, fmt)
+    if fmt == "csv":
+        records = drop_marker_line(records)
+        text = "\n".join(r.raw.decode("utf-8", errors="replace") for r in records[:1])
+    else:
+        text = strip_bom(data).decode("utf-8", errors="replace")
+    fp = fingerprint(text, fmt)
+    route = eras.resolve(source, feed, fp, LAYOUTS[fmt](text))
     namespace, table = f"bronze_{source}", f"{feed}__{route.era}{table_suffix}"
     qualified = f"{namespace}.{table}"
 
@@ -142,11 +157,11 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
         log("landed", object_uri=uri, file_sha256=sha, run_id=run_id)
 
     columns, rows = bronze.build_rows(
-        records, ingested_at=datetime.now(UTC), source_file=uri, record_source=f"{source}.{feed}", sha256=sha,
+        records, fmt, ingested_at=datetime.now(UTC), source_file=uri, record_source=f"{source}.{feed}", sha256=sha,
         run_id=run_id,
     )  # fmt: skip
     detail = {"rows": len(rows), "era": route.era, "era_kind": route.kind, "fingerprint": fp, "fp8": fp8(fp), "table": qualified,
-              "ragged_rows": bronze.ragged_count(records)}  # fmt: skip
+              "ragged_rows": bronze.ragged_count(records, fmt)}  # fmt: skip
     table_ref = f"{project}.{project}-warehouse.{namespace}.{table}"
 
     spark = bronze.build_session(bronze.rest_catalog_conf(project), cfg["versions"])
@@ -167,7 +182,7 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
         log("bronze_appended", object_uri=uri, file_sha256=sha, run_id=run_id, **detail)
 
         # AD-4 audit: count + per-record SHA-256 against the landed bytes.
-        result = reconcile.gate(records[1:], bronze.branch_rows(spark, ident, branch, run_id))
+        result = reconcile.gate(bronze.data_records(records, fmt), bronze.branch_rows(spark, ident, branch, run_id))
         if not result.passed:
             qdetail = {**result.detail, "table": qualified, "branch": branch, "reason": reconcile.REASON}
             lifecycle.record(**common, state="quarantined", detail=qdetail)
@@ -206,7 +221,7 @@ def exit_code(exc: BaseException) -> int:
     """Type-only error line; exception text can carry row values."""
     for kind, code in EXIT_CODES:
         if isinstance(exc, kind):
-            msg = {3: "no synthetic marker; file refused", 5: "not a CSV delivery; file refused",
+            msg = {3: "no synthetic marker; file refused", 5: "unsupported file format; file refused",
                    4: "reconcile gate failed; file quarantined, main untouched"}[code]  # fmt: skip
             log("error", error_type=kind.__name__, error=msg)
             return code
@@ -236,7 +251,7 @@ def run_batch(cfg: dict, run_id: str, table_suffix: str = "") -> dict:
     log("discovered", run_id=run_id, pending=len(todo))
     summary: dict = {"loaded": [], "skipped": [], "failed": {}}
     for uri, has_rows in todo:
-        if not uri.lower().endswith(".csv"):
+        if format_of(uri) is None:
             log("skipped_unsupported_format", object_uri=uri, run_id=run_id)
             summary["skipped"].append(uri)
             continue

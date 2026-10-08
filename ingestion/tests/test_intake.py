@@ -271,18 +271,18 @@ def test_unmarked_landed_once_refused_no_bronze_batch_continues(env, capsys):
     assert next(x for x in lines if x["event"] == "discovered")["pending"] == 0
 
 
-def test_non_csv_skipped_without_lifecycle_row(env, capsys):
+def test_unknown_extension_skipped_without_lifecycle_row(env, capsys):
     data = b'{"a": 1}\n'
-    u = uri_for(data, "events.jsonl")
+    u = uri_for(data, "events.txt")
     env["gcs"].objects[u] = data
     code, lines = batch(capsys)
     assert code == 0 and env["ops"].states(u) == []
     assert any(x["event"] == "skipped_unsupported_format" for x in lines)
 
 
-def test_single_file_non_csv_keeps_exit_5(env, capsys):
+def test_single_file_unknown_extension_keeps_exit_5(env, capsys):
     data = b"x"
-    assert cli.main(["--profile", "demo", "--file", uri_for(data, "e.x12")]) == 5
+    assert cli.main(["--profile", "demo", "--file", uri_for(data, "e.txt")]) == 5
 
 
 def test_one_failure_mid_batch_others_load(env, capsys):

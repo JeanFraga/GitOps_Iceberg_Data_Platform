@@ -9,6 +9,7 @@ formats:
   jsonl:
     split: LF
     quoting: none
+    skip_blank: true       # an empty or whitespace-only line is not a record; later lines keep physical ordinals
   x12:
     split: ISA16           # segment terminator at ISA offset 105; ordinal = 1-based segment
 # A record that is not valid UTF-8 is stored base64 in _raw_line with _raw_encoding = base64.

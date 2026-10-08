@@ -73,34 +73,65 @@ def build_session(catalog_conf: dict[str, str], versions: dict):
     return spark
 
 
+def data_records(records: list[Record], fmt: str = "csv") -> list[Record]:
+    """Records that become Bronze rows: CSV drops its header record; jsonl and x12 keep every record."""
+    return records[1:] if fmt == "csv" else records
+
+
+FORMAT_COLUMNS = {"jsonl": ["record"], "x12": ["segment_id", "segment"]}
+
+
 def build_rows(
-    records: list[Record], *, ingested_at: datetime, source_file: str, record_source: str, sha256: str, run_id: str
+    records: list[Record],
+    fmt: str = "csv",
+    *,
+    ingested_at: datetime,
+    source_file: str,
+    record_source: str,
+    sha256: str,
+    run_id: str,
 ) -> tuple[list[str], list[tuple]]:
-    """Header record + data records -> (column names, rows). Values are kept as strings, never logged."""
-    if not records:
-        raise BronzeError("no header record after the marker line")
-    header_rec, data = records[0], records[1:]
-    if header_rec.encoding != "utf-8":
-        raise BronzeError("header record is not UTF-8")
-    header = next(csv.reader([header_rec.raw.decode("utf-8")]))
-    columns = [h.strip().lower() for h in header]
-    if len(set(columns)) != len(columns) or any(not c or c.startswith("_") for c in columns):
-        raise BronzeError("header has empty, duplicate or reserved (_-prefixed) column names")
+    """Records -> (column names, rows). Values are kept as strings, never logged.
+
+    csv: header record + data records; jsonl: `record` (the line verbatim); x12: `segment_id`, `segment`.
+    A non-UTF-8 record gets NULL data columns (its bytes are base64 in _raw_line).
+    """
+    if fmt == "csv":
+        if not records:
+            raise BronzeError("no header record after the marker line")
+        header_rec = records[0]
+        if header_rec.encoding != "utf-8":
+            raise BronzeError("header record is not UTF-8")
+        header = next(csv.reader([header_rec.raw.decode("utf-8")]))
+        columns = [h.strip().lower() for h in header]
+        if len(set(columns)) != len(columns) or any(not c or c.startswith("_") for c in columns):
+            raise BronzeError("header has empty, duplicate or reserved (_-prefixed) column names")
+    elif fmt in FORMAT_COLUMNS:
+        columns = FORMAT_COLUMNS[fmt]
+    else:
+        raise BronzeError(f"unsupported format {fmt}")
+    # X12 element separator is ISA byte 4 (the first record is ISA).
+    x12_sep = records[0].raw[3:4].decode("utf-8", errors="replace") if fmt == "x12" and records else "*"
     rows = []
-    for rec in data:
-        if rec.encoding == "utf-8":
+    for rec in data_records(records, fmt):
+        if rec.encoding != "utf-8":
+            fields = [None] * len(columns)
+        elif fmt == "csv":
             fields = next(csv.reader([rec.raw.decode("utf-8")], strict=False), [])
             fields = (fields + [None] * len(columns))[: len(columns)]
+        elif fmt == "jsonl":
+            fields = [rec.raw.decode("utf-8")]
         else:
-            fields = [None] * len(columns)
+            text = rec.raw.decode("utf-8")
+            fields = [text.split(x12_sep, 1)[0], text]
         lineage = (rec.raw_line, rec.encoding, rec.ordinal, ingested_at, source_file, record_source, sha256, run_id)
         rows.append((*fields, *lineage))
     return columns, rows
 
 
-def ragged_count(records: list[Record]) -> int:
-    """Data records whose CSV field count differs from the header's (still loaded; counted only)."""
-    if not records:
+def ragged_count(records: list[Record], fmt: str = "csv") -> int:
+    """Data records whose CSV field count differs from the header's (still loaded; counted only). 0 for non-CSV."""
+    if fmt != "csv" or not records:
         return 0
     width = len(next(csv.reader([records[0].raw.decode("utf-8", errors="replace")])))
     return sum(
@@ -113,10 +144,15 @@ def wap_branch(sha256: str) -> str:
     return f"wap_{sha256[:8]}"
 
 
+def quoted_ident(namespace: str, table: str) -> str:
+    """Backtick-quoted identifier: feed names may start with a digit (`834__era_2024`)."""
+    return f"{CATALOG}.`{namespace}`.`{table}`"
+
+
 def ensure_table(spark, namespace: str, table: str, columns: list[str]) -> str:
     """Create namespace/table if absent (partitioned by days(_ingested_at)) and add new columns. Returns the identifier."""
-    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.{namespace}")
-    ident = f"{CATALOG}.{namespace}.{table}"
+    spark.sql(f"CREATE NAMESPACE IF NOT EXISTS {CATALOG}.`{namespace}`")
+    ident = quoted_ident(namespace, table)
     ddl = ", ".join([f"`{c}` string" for c in columns] + [f"`{n}` {t}" for n, t in LINEAGE])
     spark.sql(f"CREATE TABLE IF NOT EXISTS {ident} ({ddl}) USING iceberg PARTITIONED BY (days(_ingested_at))")
     # AD-5 additive era: new data columns are appended to the schema (nullable STRING); none are dropped.

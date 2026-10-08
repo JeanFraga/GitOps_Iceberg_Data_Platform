@@ -85,4 +85,7 @@ def split(data: bytes, file_format: str) -> list[Record]:
     data = strip_bom(data)
     if spec["split"] == "ISA16":
         return _split_x12(data)
-    return _split_lf(data, quoted=spec["quoting"] == "rfc4180")
+    out = _split_lf(data, quoted=spec["quoting"] == "rfc4180")
+    if spec.get("skip_blank"):
+        out = [r for r in out if r.raw.strip()]
+    return out
