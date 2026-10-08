@@ -3,7 +3,7 @@ title: 'Ops, steward and mpi_eval datasets and the warehouse store'
 type: 'feature'
 ticket: '7'
 created: '2026-10-08'
-status: 'built'
+status: done
 baseline_revision: '05e8fc770009db754326faa6ee87be3e77c42145'
 route: 'full'
 route_source: 'auto'

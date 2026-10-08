@@ -3,7 +3,7 @@ title: 'Step the Google providers 5 to 8.6.0'
 type: 'chore'
 ticket: '2'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '8ad22877ae729ca43e488f66debc432b1409e8db'
 route: 'oneshot'
 route_source: 'auto'

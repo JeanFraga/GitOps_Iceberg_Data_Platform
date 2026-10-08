@@ -3,7 +3,7 @@ title: 'Hash and fingerprint specs with golden vectors'
 type: 'feature'
 ticket: '4'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '761e9112674db263942a93b05fdb729a451964d8'
 route: 'full'
 route_source: 'auto'

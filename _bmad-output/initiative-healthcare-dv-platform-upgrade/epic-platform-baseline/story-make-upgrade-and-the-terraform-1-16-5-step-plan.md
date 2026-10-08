@@ -3,7 +3,7 @@ title: 'make upgrade and the Terraform 1.16.5 step'
 type: 'chore'
 ticket: '11'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '9b405e72752731d8f5f5036ce72d3f5a3cbe9f26'
 route: 'oneshot'
 route_source: 'auto'

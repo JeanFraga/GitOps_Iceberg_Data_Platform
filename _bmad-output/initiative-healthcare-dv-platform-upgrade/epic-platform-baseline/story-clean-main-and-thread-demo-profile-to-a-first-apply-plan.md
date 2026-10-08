@@ -3,7 +3,7 @@ title: 'Clean main and thread demo profile to a first apply'
 type: 'chore'
 ticket: '1'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '73522b819124f42bc64aeddd6a00ea01243a42d3'
 route: 'full'
 route_source: 'auto'

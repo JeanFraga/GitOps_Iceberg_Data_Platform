@@ -3,7 +3,7 @@ title: 'Config contract schema, template profile and validate-config'
 type: 'feature'
 ticket: '3'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '486b120f6ddea3a98ac97e84974f50d081b8ee21'
 route: 'full'
 route_source: 'auto'

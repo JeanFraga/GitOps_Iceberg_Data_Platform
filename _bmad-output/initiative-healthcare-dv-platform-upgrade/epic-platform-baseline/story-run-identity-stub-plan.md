@@ -3,7 +3,7 @@ title: 'Run-identity stub'
 type: 'feature'
 ticket: '10'
 created: '2026-10-08'
-status: 'built'
+status: done
 baseline_revision: '05270c123c49ac08228ae38bc12ccbb8584aa59e'
 route: 'oneshot'
 route_source: 'auto'

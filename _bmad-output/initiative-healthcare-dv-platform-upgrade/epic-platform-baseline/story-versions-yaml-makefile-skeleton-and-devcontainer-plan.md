@@ -3,7 +3,7 @@ title: 'versions.yaml, Makefile skeleton and devcontainer'
 type: 'chore'
 ticket: '5'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '25141f5c76748ffef5397fb024c3f6e6ba5036b0'
 route: 'oneshot'
 route_source: 'auto'

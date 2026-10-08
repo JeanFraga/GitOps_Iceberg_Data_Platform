@@ -3,7 +3,7 @@ title: 'FR-35 PHI scan and synthetic-marker check'
 type: 'feature'
 ticket: '9'
 created: '2026-10-07'
-status: 'built'
+status: done
 baseline_revision: '3cd1afcf336429c674bc79e22707ad4b59dc052c'
 route: 'full'
 route_source: 'auto'
