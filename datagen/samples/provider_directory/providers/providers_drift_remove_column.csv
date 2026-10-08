@@ -1,0 +1,12 @@
+# SYNTHETIC-DATA-NO-REAL-PHI
+npi,entity_type_code,first_name,last_name,organization_name,taxonomy_code,address_line1,city,state,zip
+2987399161,1,Oscar,Marchetti,,1223G0001X,6864 Hawthorn Way,Fairview,TN,37010
+2987657915,1,Vera,Whitlock,,1223G0001X,9750 Birch Dr,Riverton,WY,82546
+2990301840,2,,,Synthetic Fairview Primary Care Clinic 016,261QP2300X,4012 Linden Way,Fairview,TN,37061
+2991929797,1,Tomas,Marchetti,,1223G0001X,4893 Birch Way,Fairview,TN,37032
+2993839093,2,,,Synthetic Riverton General Hospital 020,282N00000X,8117 Hawthorn Ln,Riverton,WY,82547
+2995047851,1,Rosa,Galvanek,,363L00000X,9912 Oak Ct,Fairview,TN,37050
+2997117397,1,Vera,Emberly,,1223G0001X,5808 Linden Ct,Springfield,IL,62797
+2997710654,2,,,Synthetic Springfield General Hospital 092,282N00000X,9075 Maple Ave,Springfield,IL,62731
+2998679825,1,Priya,Okonkwo,,1223G0001X,8129 Juniper St,Greenville,SC,29677
+2998750154,1,Rosa,Juniper,,207R00000X,8905 Hawthorn Dr,Greenville,SC,29631

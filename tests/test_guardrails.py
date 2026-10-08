@@ -58,3 +58,45 @@ def test_phi_scan_names_file(tmp_path):
     assert guardrails.main(["phi-scan", "--names-file", str(names), str(tmp_path / "scan")]) == 1
     names.write_text("Grace Hopper\n")
     assert guardrails.main(["phi-scan", "--names-file", str(names), str(tmp_path / "scan")]) == 0
+
+
+def _weight():
+    return guardrails.SPEC["repo_weight"]
+
+
+def test_repo_weight_flags_oversized_file(tmp_path, capsys):
+    (tmp_path / "big.csv").write_bytes(b"a\n" + b"x" * (_weight()["max_bytes"] + 1))
+    assert guardrails.main(["repo-weight", str(tmp_path)]) == 1
+    err = capsys.readouterr().err
+    assert "big.csv" in err and "bytes" in err
+
+
+def test_repo_weight_flags_too_many_records(tmp_path, capsys):
+    n = _weight()["sample_records"] + 1
+    (tmp_path / "rows.csv").write_text("# marker\nid\n" + "".join(f"{i}\n" for i in range(n)))
+    assert guardrails.main(["repo-weight", str(tmp_path)]) == 1
+    assert "rows.csv" in capsys.readouterr().err
+
+
+def test_repo_weight_csv_header_and_comments_not_counted(tmp_path):
+    n = _weight()["sample_records"]
+    (tmp_path / "rows.csv").write_text("# marker\nid\n" + "".join(f"{i}\n" for i in range(n)))
+    assert guardrails.main(["repo-weight", str(tmp_path)]) == 0
+
+
+def test_repo_weight_counts_x12_claims(tmp_path):
+    n = _weight()["sample_records"]
+    (tmp_path / "a.837").write_text("ISA*x~" + "CLM*1~NM1*y~" * (n + 1))
+    (tmp_path / "b.837").write_text("ISA*x~" + "CLM*1~NM1*y~" * n)
+    assert [f.split(":")[0] for f in guardrails.repo_weight(str(tmp_path))] == [str(tmp_path / "a.837")]
+
+
+def test_repo_weight_ignores_samples_dir(tmp_path):
+    d = tmp_path / "datagen" / "samples" / "payer_a"
+    d.mkdir(parents=True)
+    (d / "big.csv").write_bytes(b"x" * (_weight()["max_bytes"] + 1))
+    assert guardrails.main(["repo-weight", str(tmp_path)]) == 0
+
+
+def test_repo_weight_clean_repo():
+    assert guardrails.main(["repo-weight"]) == 0

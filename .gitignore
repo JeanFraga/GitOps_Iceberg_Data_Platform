@@ -44,6 +44,7 @@ Thumbs.db
 *.json
 !.devcontainer/devcontainer.json
 !infra/modules/bq_ops/schemas/*.json
+!datagen/samples/manifest.json
 secrets/
 
 # Local environment – never commit these

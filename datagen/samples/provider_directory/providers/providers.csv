@@ -1,0 +1,92 @@
+# SYNTHETIC-DATA-NO-REAL-PHI
+npi,entity_type_code,first_name,last_name,credential,organization_name,taxonomy_code,address_line1,city,state,zip
+2900313026,1,Beatriz,Yarrow,DDS,,1223G0001X,6094 Juniper Dr,Greenville,SC,29688
+2902518168,1,Alice,Underhill,MD,,207Q00000X,5548 Poplar Ln,Fairview,TN,37061
+2903111500,1,Uma,Pendergast,DDS,,1223G0001X,5612 Spruce Dr,Fairview,TN,37009
+2903685131,1,Samuel,Valcourt,MD,,207R00000X,7154 Elm Ln,Fairview,TN,37098
+2903708875,1,Theo,Galvanek,NP,,363L00000X,7893 Birch Way,Fairview,TN,37095
+2904623438,1,Carmen,Dunmore,MD,,207R00000X,585 Hawthorn Rd,Riverton,WY,82517
+2904817477,1,Gabriel,Thornquist,NP,,363L00000X,3395 Poplar Ct,Fairview,TN,37094
+2905648731,2,,,,Synthetic Fairview General Hospital 008,282N00000X,1647 Willow St,Fairview,TN,37073
+2910270265,1,Theo,Galvanek,DDS,,1223G0001X,1454 Oak Ave,Springfield,IL,62721
+2911344671,1,Kenji,Dunmore,MD,,207R00000X,1497 Cedar Ave,Riverton,WY,82567
+2911699736,2,,,,Synthetic Greenville Community Pharmacy 052,3336C0003X,7028 Cedar St,Greenville,SC,29658
+2912242221,1,Pablo,Marchetti,NP,,363L00000X,3726 Juniper Dr,Fairview,TN,37073
+2914461613,1,Grace,Ravensby,MD,,207Q00000X,9766 Linden St,Springfield,IL,62708
+2914697463,2,,,,Synthetic Greenville Primary Care Clinic 056,261QP2300X,1440 Willow Way,Greenville,SC,29652
+2915175121,2,,,,Synthetic Springfield Primary Care Clinic 040,261QP2300X,7555 Cedar Rd,Springfield,IL,62708
+2916827167,2,,,,Synthetic Greenville Community Pharmacy 100,3336C0003X,5283 Hawthorn Rd,Greenville,SC,29640
+2916911334,2,,,,Synthetic Greenville General Hospital 036,282N00000X,9389 Cedar Rd,Greenville,SC,29637
+2917054035,1,Beatriz,Farrowby,MD,,207Q00000X,1606 Spruce St,Fairview,TN,37074
+2917304794,2,,,,Synthetic Riverton Primary Care Clinic 088,261QP2300X,4447 Elm Way,Riverton,WY,82515
+2917606610,1,Theo,Ashgrove,DDS,,1223G0001X,5658 Linden Rd,Springfield,IL,62711
+2917746168,2,,,,Synthetic Greenville Primary Care Clinic 024,261QP2300X,5292 Cedar St,Greenville,SC,29616
+2918668460,1,Uma,Pendergast,MD,,207Q00000X,1598 Spruce Ct,Fairview,TN,37003
+2919606790,1,Tamar,Marchetti,MD,,207Q00000X,2059 Cedar Ct,Greenville,SC,29607
+2922538311,1,Amara,Pendergast,NP,,363L00000X,90 Linden St,Fairview,TN,37067
+2924081880,2,,,,Synthetic Riverton General Hospital 084,282N00000X,4922 Linden Way,Riverton,WY,82573
+2924782909,1,Ben,Ashgrove,MD,,207R00000X,3944 Linden Way,Fairview,TN,37025
+2925380612,1,Gabriel,Okonkwo,MD,,207R00000X,3322 Cedar Way,Greenville,SC,29643
+2926801053,1,Amara,Brightwater,MD,,207Q00000X,8051 Oak St,Riverton,WY,82517
+2927859100,2,,,,Synthetic Fairview Primary Care Clinic 044,261QP2300X,5795 Cedar Dr,Fairview,TN,37043
+2929666792,1,Aarav,Quillon,DDS,,1223G0001X,3763 Maple Rd,Riverton,WY,82565
+2929845875,1,Zane,Farrowby,DDS,,1223G0001X,1526 Cedar Ct,Fairview,TN,37008
+2930121563,1,Priya,Ravensby,MD,,207R00000X,3624 Birch Dr,Riverton,WY,82593
+2931559100,1,Gabriel,Farrowby,NP,,363L00000X,3277 Elm Way,Fairview,TN,37004
+2932830963,1,Chloe,Farrowby,DDS,,1223G0001X,2397 Poplar Ave,Springfield,IL,62782
+2932976717,2,,,,Synthetic Greenville General Hospital 072,282N00000X,7288 Birch St,Greenville,SC,29687
+2934011463,1,Carlos,Coldridge,DDS,,1223G0001X,4020 Hawthorn Ct,Riverton,WY,82594
+2934766371,1,Fatima,Marchetti,MD,,207Q00000X,1016 Oak Dr,Greenville,SC,29609
+2935007395,1,Omar,Brightwater,MD,,207R00000X,7619 Hawthorn Dr,Springfield,IL,62768
+2937307686,1,Mateo,Underhill,NP,,363L00000X,8845 Hawthorn St,Greenville,SC,29668
+2937966754,1,Hana,Abara,MD,,207R00000X,3192 Oak Way,Greenville,SC,29647
+2938150986,1,Leo,Valcourt,NP,,363L00000X,2780 Oak Ln,Springfield,IL,62790
+2938662774,1,Yusuf,Whitlock,MD,,207R00000X,1448 Willow Dr,Riverton,WY,82534
+2945711648,2,,,,Synthetic Greenville Primary Care Clinic 032,261QP2300X,4419 Juniper Way,Greenville,SC,29617
+2946777069,1,Nikhil,Farrowby,MD,,207Q00000X,8072 Linden Rd,Springfield,IL,62713
+2947088680,1,Umar,Yarrow,NP,,363L00000X,31 Juniper Ave,Fairview,TN,37087
+2951166000,1,Carmen,Valcourt,DDS,,1223G0001X,2175 Hawthorn Way,Fairview,TN,37040
+2951625591,1,Leo,Whitlock,MD,,207R00000X,7908 Hawthorn Ct,Riverton,WY,82557
+2952314039,2,,,,Synthetic Greenville Community Pharmacy 048,3336C0003X,5160 Cedar Ave,Greenville,SC,29694
+2952993709,2,,,,Synthetic Greenville General Hospital 076,282N00000X,7227 Maple Rd,Greenville,SC,29696
+2954625143,2,,,,Synthetic Greenville Primary Care Clinic 028,261QP2300X,9000 Poplar Dr,Greenville,SC,29624
+2954821700,1,Amara,Quillon,MD,,207R00000X,7294 Juniper Way,Fairview,TN,37028
+2957097597,1,Maya,Draycott,MD,,207R00000X,6657 Elm Ave,Riverton,WY,82549
+2957177753,1,Ingrid,Greywood,MD,,207R00000X,7135 Hawthorn Ct,Greenville,SC,29692
+2957335286,1,Jonas,Okonkwo,DDS,,1223G0001X,4037 Maple Ave,Riverton,WY,82591
+2958040992,1,Tamar,Dunmore,MD,,207Q00000X,1221 Hawthorn Ave,Riverton,WY,82556
+2958247647,2,,,,Synthetic Greenville General Hospital 064,282N00000X,9303 Juniper Way,Greenville,SC,29662
+2959333644,1,Nadia,Greywood,MD,,207R00000X,8790 Aspen Way,Greenville,SC,29645
+2962760908,1,Priya,Draycott,MD,,207Q00000X,2279 Elm Ct,Fairview,TN,37003
+2963017233,1,Felix,Nakashima,NP,,363L00000X,2060 Hawthorn Ln,Springfield,IL,62701
+2963434107,1,Hana,Draycott,DDS,,1223G0001X,9827 Hawthorn Ct,Greenville,SC,29682
+2963569787,1,Aarav,Pendergast,NP,,363L00000X,8027 Willow Ave,Fairview,TN,37050
+2964256897,1,Rosa,Ivarsen,MD,,207R00000X,2833 Hawthorn Rd,Springfield,IL,62744
+2965289723,1,Pablo,Coldridge,MD,,207R00000X,2201 Hawthorn Dr,Greenville,SC,29623
+2967028020,1,Tamar,Dunmore,MD,,207R00000X,9127 Juniper Ave,Springfield,IL,62749
+2967736333,1,Theo,Bellweather,DDS,,1223G0001X,2992 Oak Way,Fairview,TN,37082
+2969603481,2,,,,Synthetic Greenville General Hospital 068,282N00000X,715 Oak Ct,Greenville,SC,29608
+2970776599,1,Nikhil,Ivarsen,NP,,363L00000X,2626 Cedar Rd,Fairview,TN,37025
+2971502283,1,Kenji,Zelenko,MD,,207R00000X,955 Spruce Ave,Springfield,IL,62752
+2972280665,1,Quinn,Abara,MD,,207R00000X,5660 Oak Rd,Fairview,TN,37000
+2972869061,2,,,,Synthetic Greenville Community Pharmacy 004,3336C0003X,9372 Hawthorn Ct,Greenville,SC,29681
+2973104641,1,Amara,Eskildsen,MD,,207R00000X,6321 Cedar Ave,Springfield,IL,62703
+2973636196,2,,,,Synthetic Greenville Primary Care Clinic 060,261QP2300X,3973 Birch Rd,Greenville,SC,29683
+2976480279,1,Yara,Ashgrove,MD,,207R00000X,6057 Elm St,Greenville,SC,29616
+2976943813,1,Jamal,Okonkwo,MD,,207R00000X,7024 Spruce Ct,Greenville,SC,29681
+2978621961,1,Pablo,Fairhaven,MD,,207R00000X,2260 Maple St,Greenville,SC,29656
+2979059765,1,Carlos,Marchetti,MD,,207R00000X,8438 Poplar Ave,Riverton,WY,82595
+2979420603,1,Dana,Lindqvist,MD,,207Q00000X,9498 Oak Rd,Fairview,TN,37037
+2980571717,1,Oscar,Abara,NP,,363L00000X,5449 Poplar Way,Riverton,WY,82559
+2981419163,1,Leo,Saltonstall,NP,,363L00000X,3995 Linden Ln,Fairview,TN,37048
+2981626304,2,,,,Synthetic Fairview Community Pharmacy 012,3336C0003X,8462 Aspen Rd,Fairview,TN,37059
+2982093561,2,,,,Synthetic Greenville General Hospital 096,282N00000X,6804 Willow Rd,Greenville,SC,29633
+2982795181,1,Tamar,Holloway,MD,,207Q00000X,6439 Elm Ln,Greenville,SC,29607
+2983686546,1,Zoe,Underhill,NP,,363L00000X,677 Spruce Ave,Springfield,IL,62722
+2983831399,1,Yusuf,Thornquist,MD,,207Q00000X,7810 Cedar Way,Greenville,SC,29692
+2983950694,1,Alice,Dunmore,MD,,207Q00000X,8471 Poplar Ave,Greenville,SC,29628
+2984553364,1,Ivan,Okonkwo,MD,,207Q00000X,9234 Linden Rd,Fairview,TN,37012
+2984876260,1,Wren,Saltonstall,MD,,207R00000X,3274 Spruce Ct,Riverton,WY,82579
+2985052218,1,Rafael,Juniper,NP,,363L00000X,2064 Elm Ln,Springfield,IL,62753
+2985444415,2,,,,Synthetic Springfield Community Pharmacy 080,3336C0003X,3049 Maple Rd,Springfield,IL,62743
+2987195304,1,Ingrid,Bellweather,MD,,207Q00000X,7867 Hawthorn Way,Springfield,IL,62763

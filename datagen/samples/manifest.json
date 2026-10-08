@@ -1,0 +1,405 @@
+{
+  "_synthetic": "SYNTHETIC-DATA-NO-REAL-PHI",
+  "seed": 20261008,
+  "volume_profile": "sample",
+  "run": "train",
+  "edge_case_rate": 0.02,
+  "noise_scenarios": [
+    "dob_day_month_swap",
+    "hyphenated_surname",
+    "jr_sr",
+    "name_swap",
+    "nickname",
+    "shared_household",
+    "ssn_last4",
+    "ssn_missing",
+    "surname_change",
+    "typo"
+  ],
+  "files": [
+    {
+      "path": "emr_facility_1/encounter/emr_facility_1_encounter_F1.ndjson",
+      "source": "emr_facility_1",
+      "feed": "encounter",
+      "sha256": "a3a75a38b367fcea8b2793898b0e3d6ac9777cf7bbd88a42aaa4a91a187d727e",
+      "records": 1000,
+      "era": "F1"
+    },
+    {
+      "path": "emr_facility_1/organization/emr_facility_1_organization_F1.ndjson",
+      "source": "emr_facility_1",
+      "feed": "organization",
+      "sha256": "5e1557ad878bf1e0f273d1b2733a9b16cdc0678048f71cbe86c895bf45a13fd1",
+      "records": 20,
+      "era": "F1"
+    },
+    {
+      "path": "emr_facility_1/patient/emr_facility_1_patient_F1.ndjson",
+      "source": "emr_facility_1",
+      "feed": "patient",
+      "sha256": "665cf038b80a1bdfeced22871015b3198815ece7848f532ce3925ec82d5310ce",
+      "records": 558,
+      "era": "F1"
+    },
+    {
+      "path": "emr_facility_1/patient/emr_facility_1_patient_F1_drift_date_format.ndjson",
+      "source": "emr_facility_1",
+      "feed": "patient",
+      "sha256": "7686a9740313f4d67e1ac8800204ef701a32afee8afd30fa4dbd3891007e1245",
+      "records": 61,
+      "era": "F1"
+    },
+    {
+      "path": "emr_facility_1/practitioner/emr_facility_1_practitioner_F1.ndjson",
+      "source": "emr_facility_1",
+      "feed": "practitioner",
+      "sha256": "c373ee85aaab4d36468b2806f3c4785ade573fa985a0ed3a7c2a7a9f9a6be43f",
+      "records": 40,
+      "era": "F1"
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202401.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "24e865438fcf6c04898d9912d3199d9dfb99cd3686b0902bb1fefdfc1e49f435",
+      "records": 21
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202402.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "c175dc8e5977911a22db4fc8444fa208e3d389aadff6a0b613ec66ca76ae1f80",
+      "records": 60
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202403.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "4e35b521d9c37b86f70f9892da83b0cadfab3cdeb364806c0a82fc5df3b9af11",
+      "records": 71
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202404.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "ec1ce18e35f23f9dae4fc346638f01426d9959b8eb12ffd1ba79a6374297cafe",
+      "records": 78
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202405.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "0119a9e5742adf099d27ed664a4f4b76a760817dc3ddb38ed49f930bbd55b422",
+      "records": 79
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202406.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "2e63cd872b9fdba8e5c632dc750d1faeef84e4e0b81cb1e447eb8fb587795e95",
+      "records": 73
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202407.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "d7b6c54aea30494dd4d01c801a507eeb90dee65cd422005558f27def241002dc",
+      "records": 83
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202408.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "2c3a09a6b8b36acf11e5b272af7811f642416e5c44584cd9cc80c361770af3ba",
+      "records": 93
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202409.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "cb18aeaba09ae8a922ba16d468ece3060c3271db6656c01506ae1d11595718d4",
+      "records": 81
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202410.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "fd8c465b8c4607f26580d6a38a1a83d05dda5ce7d3d1b53ad37bc4842739a44b",
+      "records": 69
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202411.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "4d92d26873665c95900484aed07b2f31a053f0951057cd27d9932f6475f1571f",
+      "records": 77
+    },
+    {
+      "path": "payer_a/834/payer_a_834_change_202412.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "61a1da84f23468f7977031bfd22fe75b8bdd5a9b8997c5d2609d67289dcc7500",
+      "records": 57
+    },
+    {
+      "path": "payer_a/834/payer_a_834_full_20240101.834",
+      "source": "payer_a",
+      "feed": "834",
+      "sha256": "dec9b4353bb5fcd043fd3ad8c951235d1ee499637751d516ed1c920da5f549b8",
+      "records": 750
+    },
+    {
+      "path": "payer_a/835/payer_a_835_d_A1.835",
+      "source": "payer_a",
+      "feed": "835",
+      "sha256": "d0aa85cb907fbe9e8b2bf9332ce7f84fa32aa71083b87ac77101684791420c89",
+      "records": 1000,
+      "era": "A1"
+    },
+    {
+      "path": "payer_a/835/payer_a_835_d_A2.835",
+      "source": "payer_a",
+      "feed": "835",
+      "sha256": "1625c9d86d1b69753515fe82d6a0f37d51ac3acba9a4b40ea650b88acb1e8d86",
+      "records": 1000,
+      "era": "A2"
+    },
+    {
+      "path": "payer_a/835/payer_a_835_i_A1.835",
+      "source": "payer_a",
+      "feed": "835",
+      "sha256": "93293e7d929f8e56323e2cea0643cc96092b99270166dca3189e329adfd633c8",
+      "records": 1000,
+      "era": "A1"
+    },
+    {
+      "path": "payer_a/835/payer_a_835_i_A2.835",
+      "source": "payer_a",
+      "feed": "835",
+      "sha256": "d27be84938026509ae62c1b8e73804c41209950640fd51bae5b3b9460bdfcb52",
+      "records": 1000,
+      "era": "A2"
+    },
+    {
+      "path": "payer_a/835/payer_a_835_p_A1.835",
+      "source": "payer_a",
+      "feed": "835",
+      "sha256": "e574716c0e045025fc7f871f6ea6b7fcaa6fe6b2908ce8292c393f33e0983393",
+      "records": 1000,
+      "era": "A1"
+    },
+    {
+      "path": "payer_a/835/payer_a_835_p_A2.835",
+      "source": "payer_a",
+      "feed": "835",
+      "sha256": "6eb58fe0dee5ba7dc8d1ce1ae0669b3823596e2736e2de4eb62ae1647ecd3ef5",
+      "records": 1000,
+      "era": "A2"
+    },
+    {
+      "path": "payer_a/837d/payer_a_837d_A1.837",
+      "source": "payer_a",
+      "feed": "837d",
+      "sha256": "1193b9c1a2d00592aa1b9cc98338a6d78de849a37df2dc34ec384b837671c785",
+      "records": 1000,
+      "era": "A1"
+    },
+    {
+      "path": "payer_a/837d/payer_a_837d_A2.837",
+      "source": "payer_a",
+      "feed": "837d",
+      "sha256": "bc29ffe3184527726512686736deb70336ad1cddb1e1445b8f9d91a1d9f1c548",
+      "records": 1000,
+      "era": "A2"
+    },
+    {
+      "path": "payer_a/837i/payer_a_837i_A1.837",
+      "source": "payer_a",
+      "feed": "837i",
+      "sha256": "ee702f644539210c26c233263d0d6dc9f4239cb74f18903bff055f48d31b75cb",
+      "records": 1000,
+      "era": "A1"
+    },
+    {
+      "path": "payer_a/837i/payer_a_837i_A2.837",
+      "source": "payer_a",
+      "feed": "837i",
+      "sha256": "a1dbcec397ebd5ca9d32e952f0af2d0e9ca60a430c9c51012e9d7d722c80859a",
+      "records": 1000,
+      "era": "A2"
+    },
+    {
+      "path": "payer_a/837p/payer_a_837p_A1.837",
+      "source": "payer_a",
+      "feed": "837p",
+      "sha256": "e7b1737a78051c94dfca751ab515ad29643104b5a2b3f6da4d3f43e7e73620d6",
+      "records": 1000,
+      "era": "A1"
+    },
+    {
+      "path": "payer_a/837p/payer_a_837p_A2.837",
+      "source": "payer_a",
+      "feed": "837p",
+      "sha256": "6e0c02bac9d7d6895111122358b08cce68fab7c20b911dac678af620f72a6476",
+      "records": 1000,
+      "era": "A2"
+    },
+    {
+      "path": "payer_a/pharmacy/payer_a_pharmacy_2024.csv",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "sha256": "1a4ae3a8ebb42f64d0c188c65828c24bd714c6eaa710a54f2b7ebc00d6ac2871",
+      "records": 640
+    },
+    {
+      "path": "payer_a/pharmacy/payer_a_pharmacy_2024_datadrift_amount_shift.csv",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "sha256": "dcce03f186def015db5218bf4f8d46f2175fce926aa9e4c05c62dd3bb4050e8c",
+      "records": 80
+    },
+    {
+      "path": "payer_a/pharmacy/payer_a_pharmacy_2024_datadrift_unit_scale.csv",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "sha256": "f7e9f3bc39d87e42583470ad696d9ba8b8f7d4eb235060f5e6f29f33ed410708",
+      "records": 80
+    },
+    {
+      "path": "payer_a/pharmacy/payer_a_pharmacy_2024_drift_add_column.csv",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "sha256": "ed984a617bf8ebfcb89d1696fcba23d64d958d3fc5ee70126cbd322bd687151b",
+      "records": 100
+    },
+    {
+      "path": "payer_a/pharmacy/payer_a_pharmacy_2024_drift_cast_failure.csv",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "sha256": "860444d61ae43e9726b5627271b299da5398d598c089ed07fdef8ceb9b467386",
+      "records": 100
+    },
+    {
+      "path": "payer_b/members/payer_b_members_2024.csv",
+      "source": "payer_b",
+      "feed": "members",
+      "sha256": "6b79bc0b9e8476901ed9a60f2707a4269df2e6288e5f1ea4e3bedf314fe7b10d",
+      "records": 720
+    },
+    {
+      "path": "payer_b/members/payer_b_members_2024_datadrift_code_mix.csv",
+      "source": "payer_b",
+      "feed": "members",
+      "sha256": "fa0ac8233fcbb1b5d73a7974939b4e13a9e9439bcbf3eb3b320ccb250d779df8",
+      "records": 90
+    },
+    {
+      "path": "payer_b/members/payer_b_members_2024_datadrift_null_rate.csv",
+      "source": "payer_b",
+      "feed": "members",
+      "sha256": "78af5f4562f47fb941a1cd397c58cfb6324d700f73443972ef221d804880053a",
+      "records": 90
+    },
+    {
+      "path": "payer_b/members/payer_b_members_2024_drift_rename_column.csv",
+      "source": "payer_b",
+      "feed": "members",
+      "sha256": "e07f2381c7cc44991c724d12ed0dcd8bcfb325be4f392e425cc4f24f8735cea9",
+      "records": 100
+    },
+    {
+      "path": "provider_directory/providers/providers.csv",
+      "source": "provider_directory",
+      "feed": "providers",
+      "sha256": "715443f7fc5556df7567b6abafe88598d23a3119aa423c056980c0cb61983fcd",
+      "records": 90
+    },
+    {
+      "path": "provider_directory/providers/providers_drift_remove_column.csv",
+      "source": "provider_directory",
+      "feed": "providers",
+      "sha256": "3d474d49d84577c13d14a78ecde48ac842bf1e9db084afb91037fb09b3c8aee4",
+      "records": 10
+    }
+  ],
+  "schema_drift": [
+    {
+      "scenario": "rename_column",
+      "source": "payer_b",
+      "feed": "members",
+      "file": "payer_b/members/payer_b_members_2024_drift_rename_column.csv",
+      "field": "dob",
+      "first_affected_record": 3
+    },
+    {
+      "scenario": "add_column",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "file": "payer_a/pharmacy/payer_a_pharmacy_2024_drift_add_column.csv",
+      "field": "prior_auth_number",
+      "first_affected_record": 3
+    },
+    {
+      "scenario": "cast_failure",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "file": "payer_a/pharmacy/payer_a_pharmacy_2024_drift_cast_failure.csv",
+      "field": "quantity_dispensed",
+      "first_affected_record": 7
+    },
+    {
+      "scenario": "remove_column",
+      "source": "provider_directory",
+      "feed": "providers",
+      "file": "provider_directory/providers/providers_drift_remove_column.csv",
+      "field": "credential",
+      "first_affected_record": 3
+    },
+    {
+      "scenario": "date_format",
+      "source": "emr_facility_1",
+      "feed": "patient",
+      "file": "emr_facility_1/patient/emr_facility_1_patient_F1_drift_date_format.ndjson",
+      "field": "birthDate",
+      "first_affected_record": 1
+    }
+  ],
+  "data_drift": [
+    {
+      "scenario": "code_mix",
+      "source": "payer_b",
+      "feed": "members",
+      "file": "payer_b/members/payer_b_members_2024_datadrift_code_mix.csv",
+      "field": "sex",
+      "magnitude": 0.5,
+      "first_affected_record": 3
+    },
+    {
+      "scenario": "null_rate",
+      "source": "payer_b",
+      "feed": "members",
+      "file": "payer_b/members/payer_b_members_2024_datadrift_null_rate.csv",
+      "field": "pcp_npi",
+      "magnitude": 0.4,
+      "first_affected_record": 3
+    },
+    {
+      "scenario": "unit_scale",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "file": "payer_a/pharmacy/payer_a_pharmacy_2024_datadrift_unit_scale.csv",
+      "field": "quantity_dispensed",
+      "magnitude": 10,
+      "first_affected_record": 3
+    },
+    {
+      "scenario": "amount_shift",
+      "source": "payer_a",
+      "feed": "pharmacy",
+      "file": "payer_a/pharmacy/payer_a_pharmacy_2024_datadrift_amount_shift.csv",
+      "field": "total_amount_paid",
+      "magnitude": 0.4,
+      "first_affected_record": 3
+    }
+  ]
+}

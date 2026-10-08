@@ -1,10 +1,11 @@
-"""python -m datagen generate [--volume ci|full] [--eval] [--force] | python -m datagen upload
+"""python -m datagen generate [--volume ci|full] [--eval] [--force] | upload | samples
 
 VOLUME=full generates to a temp dir outside the repo and lands it in gs://$PROJECT-landing/."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -12,11 +13,58 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 from datagen import config, data_drift, drift, estimate, noise
 from datagen.generate import Context, generate
 from datagen.upload import UploadError, upload
 
 LANDED_VOLUMES = ("full",)  # generated outside the repo and streamed to landing
+SAMPLES = Path(__file__).resolve().parent / "samples"
+
+
+def _context(cfg: dict, name: str, volume: dict, eval_run: bool = False) -> Context:
+    dg = cfg["datagen"]
+    return Context(
+        dg["eval_seed"] if eval_run else dg["seed"],
+        name,
+        volume,
+        config.marker_token(),
+        edge_case_rate=float(dg.get("edge_case_rate", 0.02)),
+        scenarios=noise.scenario_set() if eval_run else noise.scenario_set(dg.get("eval_only_scenarios", [])),
+        run="eval" if eval_run else "train",
+        schema_drift=tuple(dg.get("schema_drift", [])),
+        data_drift=tuple(dg.get("data_drift", [])),
+    )
+
+
+def sample_records(path: Path = config.GUARDRAILS) -> int:
+    return int(yaml.safe_load(path.read_text())["repo_weight"]["sample_records"])
+
+
+def _unland(value: str) -> str:
+    return value.removeprefix("landing/")
+
+
+def write_samples(cfg: dict, target: Path = SAMPLES) -> dict:
+    """Sample-sized train run -> target/<source>/<feed>/*, ground_truth/, manifest.json (no names.txt)."""
+    ctx = _context(cfg, "sample", {"records_per_file": sample_records(), "years": 1})
+    tmp = Path(tempfile.mkdtemp(prefix="datagen-samples-"))
+    try:
+        out = tmp / "out"
+        manifest = generate(ctx, out)
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(out / "landing", target)
+        shutil.copytree(out / "ground_truth", target / "ground_truth")
+        for f in manifest["files"]:
+            f["path"] = _unland(f["path"])
+        for e in (*manifest["schema_drift"], *manifest["data_drift"]):
+            e["file"] = _unland(e["file"])
+        (target / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return manifest
 
 
 def run_full(ctx: Context, cfg: dict, force: bool, run=subprocess.run) -> int:
@@ -52,29 +100,25 @@ def main(argv: list[str] | None = None) -> int:
     gen.add_argument("--eval", action="store_true", help="held-out eval run: datagen.eval_seed, all scenarios")
     gen.add_argument("--force", action="store_true", help="land even when the estimate exceeds budget headroom")
     sub.add_parser("upload", help="land files and load mpi_eval.ground_truth")
+    sub.add_parser("samples", help="regenerate committed datagen/samples/ (repo_weight.sample_records per file)")
     args = parser.parse_args(argv)
     cfg = config.load()
     try:
         if args.cmd == "generate":
             name, volume = config.resolve_volume(cfg, args.volume, config.read_env())
-            dg = cfg["datagen"]
-            train_scenarios = noise.scenario_set(dg.get("eval_only_scenarios", []))
-            ctx = Context(
-                dg["eval_seed"] if args.eval else dg["seed"],
-                name,
-                volume,
-                config.marker_token(),
-                edge_case_rate=float(dg.get("edge_case_rate", 0.02)),
-                scenarios=noise.scenario_set() if args.eval else train_scenarios,
-                run="eval" if args.eval else "train",
-                schema_drift=tuple(dg.get("schema_drift", [])),
-                data_drift=tuple(dg.get("data_drift", [])),
-            )
+            ctx = _context(cfg, name, volume, args.eval)
             if name in LANDED_VOLUMES:
                 return run_full(ctx, cfg, args.force or bool(os.environ.get("FORCE")))
             manifest = generate(ctx)
             for f in manifest["files"]:
                 print(f"{f['path']}: {f['records']} records sha256={f['sha256']}")
+        elif args.cmd == "samples":
+            totals: dict[str, int] = {}
+            for f in write_samples(cfg)["files"]:
+                key = f"{f['source']}/{f['feed']}"
+                totals[key] = totals.get(key, 0) + f["records"]
+            for key, n in sorted(totals.items()):
+                print(f"{key}: {n} records")
         else:
             for line in upload(cfg):
                 print(line)

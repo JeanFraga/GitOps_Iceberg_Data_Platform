@@ -12,6 +12,10 @@ phi_scan:
   # Full names emitted by the generator; datagen (E2) appends them here or passes --names.
   names: []
   max_file_bytes: 5000000
+# FR-37 repo-weight guard and `make samples` size. Read by tools/guardrails.py and datagen.
+repo_weight:
+  sample_records: 1000  # records_per_file of the committed datagen/samples/ run; max records per data file elsewhere
+  max_bytes: 1048576    # max bytes per committed data file outside datagen/samples/
 # Repo-wide default runs skip these (fixtures are seeded on purpose; tooling is vendored).
 allowlist:
   - tests/fixtures/
@@ -19,3 +23,5 @@ allowlist:
   - _bmad-output/
   - .agents/
   - .claude/
+  # Committed synthetic samples: PHI scanning targets logs/summaries only. marker-check still covers them.
+  - datagen/samples/

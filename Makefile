@@ -39,6 +39,12 @@ generate: resolve ## Seeded synthetic data (VOLUME=ci -> datagen/out/; VOLUME=fu
 generate-upload: resolve ## Land datagen/out/ files in the landing bucket and load mpi_eval.ground_truth
 	$(UV) run python -m datagen upload
 
+samples: resolve ## FR-37: regenerate committed datagen/samples/ (repo_weight.sample_records per file, deterministic)
+	$(UV) run python -m datagen samples
+
+repo-weight: ## FR-37: fail on committed data files over the record/byte limit outside datagen/samples/. PATH=dir
+	$(GUARD) repo-weight $(SCAN_PATH)
+
 upgrade: ## Manual platform upgrade (AD-20/FR-40): prints the platform-upgrade skill invocation
 	@echo "Platform upgrades run through the Claude Code skill .claude/skills/platform-upgrade."
 	@echo "In Claude Code, run:  /platform-upgrade"
@@ -94,6 +100,6 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 		echo "tflint not installed; skipping"; \
 	fi
 
-validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check tf-validate tflint ## Run all local checks (later entries append targets here)
+validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check repo-weight tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

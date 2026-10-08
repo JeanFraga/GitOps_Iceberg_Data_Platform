@@ -187,3 +187,19 @@ def test_person_code_roles_and_whole_households(out):
         )
         assert [r["person_code"] for r in group] == expected
         assert all(r["member_id"].endswith("-" + r["person_code"]) for r in group)
+
+
+def test_samples_deterministic_one_dir_per_feed(tmp_path):
+    from datagen.__main__ import write_samples
+
+    cfg = config.load()
+    write_samples(cfg, tmp_path / "a")
+    write_samples(cfg, tmp_path / "b")
+    assert _hashes(tmp_path / "a") == _hashes(tmp_path / "b")
+    assert not (tmp_path / "a" / "names.txt").exists()
+    for feed in registry.discover():
+        assert any((tmp_path / "a" / feed.source / feed.feed).iterdir())
+    m = json.loads((tmp_path / "a" / "manifest.json").read_text())
+    assert m["schema_drift"] and m["data_drift"]
+    for e in (*m["schema_drift"], *m["data_drift"]):
+        assert (tmp_path / "a" / e["file"]).is_file()
