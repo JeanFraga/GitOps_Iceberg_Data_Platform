@@ -23,6 +23,12 @@ datagen:
   edge_case_rate: 0.02
   eval_only_scenarios: [twin, cross_payer_switch]
   volume_profile: ci
+  schema_drift:
+    - {scenario: rename_column, source: payer_b, feed: members, field: dob, to: birth_date}
+    - {scenario: add_column, source: payer_a, feed: pharmacy, field: prior_auth_number}
+    - {scenario: cast_failure, source: payer_a, feed: pharmacy, field: quantity_dispensed}
+    - {scenario: remove_column, source: provider_directory, feed: providers, field: credential}
+    - {scenario: date_format, source: emr_facility_1, feed: patient, field: birthDate}
   volume_profiles:
     ci: {records_per_file: 5000, years: 1}
     full: {records_per_file: 30000, years: 2}

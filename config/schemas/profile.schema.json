@@ -167,6 +167,43 @@
             "type": "string"
           }
         },
+        "schema_drift": {
+          "description": "FR-3 schema drift targets, applied in order (datagen/drift.py).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scenario",
+              "source",
+              "feed",
+              "field"
+            ],
+            "properties": {
+              "scenario": {
+                "enum": [
+                  "rename_column",
+                  "add_column",
+                  "remove_column",
+                  "date_format",
+                  "cast_failure"
+                ]
+              },
+              "source": {
+                "type": "string"
+              },
+              "feed": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "volume_profile": {
           "enum": [
             "ci",

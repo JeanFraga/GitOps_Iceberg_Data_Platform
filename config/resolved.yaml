@@ -14,6 +14,28 @@ datagen:
   - twin
   - cross_payer_switch
   eval_seed: 20261009
+  schema_drift:
+  - scenario: rename_column
+    source: payer_b
+    feed: members
+    field: dob
+    to: birth_date
+  - scenario: add_column
+    source: payer_a
+    feed: pharmacy
+    field: prior_auth_number
+  - scenario: cast_failure
+    source: payer_a
+    feed: pharmacy
+    field: quantity_dispensed
+  - scenario: remove_column
+    source: provider_directory
+    feed: providers
+    field: credential
+  - scenario: date_format
+    source: emr_facility_1
+    feed: patient
+    field: birthDate
   seed: 20261008
   volume_profile: ci
   volume_profiles:

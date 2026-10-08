@@ -8,7 +8,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from datagen import noise, population, registry
+from datagen import drift, noise, population, registry
 
 OUT = Path(__file__).resolve().parent / "out"
 BASE_YEAR = 2024
@@ -24,6 +24,7 @@ class Context:
     edge_case_rate: float = 0.02
     scenarios: tuple[str, ...] = tuple(noise.SCENARIOS)
     run: str = "train"
+    schema_drift: tuple[dict, ...] = ()
     cache: dict = field(default_factory=dict, repr=False)
     _built: dict[int, tuple[population.Household, ...]] = field(default_factory=dict, repr=False)
 
@@ -46,14 +47,31 @@ def _jsonl(rows: list[dict], token: str, seed: int) -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
+def _order(ctx: Context, entry: dict) -> int:
+    """Config order of a manifest drift entry."""
+    return next(
+        i
+        for i, t in enumerate(ctx.schema_drift)
+        if (t["scenario"], t["source"], t["feed"]) == (entry["scenario"], entry["source"], entry["feed"])
+    )
+
+
 def generate(ctx: Context, out: Path = OUT, feeds: list[registry.Feed] | None = None) -> dict:
     if out.exists():
         shutil.rmtree(out)
     truth: dict[str, list[dict]] = {t: [] for t in TRUTH_TABLES}
-    files, names = [], set()
-    for feed in feeds if feeds is not None else registry.discover():
+    files, names, drift_entries = [], set(), []
+    feed_list = feeds if feeds is not None else registry.discover()
+    drift.validate(ctx.schema_drift)
+    generated = {(f.source, f.feed) for f in feed_list}
+    for t in ctx.schema_drift:
+        if (t["source"], t["feed"]) not in generated:
+            raise drift.DriftError(f"schema drift target {t['source']}/{t['feed']} is not a generated feed")
+    for feed in feed_list:
         result = feed.generate(ctx)
-        for f in result.files:
+        drifted, entries = drift.apply(ctx, feed, result.files)
+        drift_entries += entries
+        for f in drifted:
             rel = Path("landing") / feed.source / feed.feed / f.name
             (out / rel).parent.mkdir(parents=True, exist_ok=True)
             (out / rel).write_bytes(f.content)
@@ -84,7 +102,7 @@ def generate(ctx: Context, out: Path = OUT, feeds: list[registry.Feed] | None = 
         "edge_case_rate": ctx.edge_case_rate,
         "noise_scenarios": present,
         "files": sorted(files, key=lambda f: f["path"]),
-        "schema_drift": [],
+        "schema_drift": sorted(drift_entries, key=lambda e: _order(ctx, e)),
         "data_drift": [],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
