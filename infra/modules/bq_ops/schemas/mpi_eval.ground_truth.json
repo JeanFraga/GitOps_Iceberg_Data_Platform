@@ -22,5 +22,11 @@
     "type": "STRING",
     "mode": "REQUIRED",
     "description": "True person identity"
+  },
+  {
+    "name": "noise_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Identity-noise scenario applied to this record (null when clean); FR-19 breakdown"
   }
 ]
