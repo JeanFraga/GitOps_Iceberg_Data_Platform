@@ -1,7 +1,8 @@
 """Batch discovery: `gcloud storage ls` on the landing bucket joined against ops.file_lifecycle by object_uri.
 
 Never lists the catalog or Iceberg tables. Pending = an AD-3 object with no lifecycle row, or whose rows
-are all `landed` (a later state, including rejected_duplicate, is terminal for discovery).
+are all `landed` (a later state, including rejected_duplicate, is terminal for discovery). A `landed` row
+whose detail carries `refused` (unmarked) is terminal too: the refusal was logged once.
 """
 
 from __future__ import annotations
@@ -22,8 +23,10 @@ def list_landing(bucket: str, run=None) -> list[str]:
 
 def pending(project_id: str, max_bytes_billed: int, bucket: str, run=None) -> list[tuple[str, bool]]:
     """[(uri, has_rows)] in listing order; has_rows tells the caller whether `landed` is already recorded."""
+
     uris = list_landing(bucket, run)
     rows = lifecycle.rows_for_uris(
         project_id=project_id, max_bytes_billed=max_bytes_billed, uris=uris, run=run or subprocess.run
     )
-    return [(u, u in rows) for u in uris if all(s == "landed" for s in rows.get(u, []))]
+    return [(u, u in rows) for u in uris
+            if all(r["state"] == "landed" and not r.get("refused") for r in rows.get(u, []))]  # fmt: skip

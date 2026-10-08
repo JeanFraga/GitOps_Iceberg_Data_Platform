@@ -3,20 +3,41 @@ title: 'Landing intake: discovery, duplicates, overwrite and unmarked refusal'
 type: 'feature'
 ticket: '4'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '13679e7db7b32be101b15b76f0e3578e94662cc1'
 route: 'full'
 route_source: 'auto'
 risk: 'medium'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/initiative-healthcare-dv-platform-upgrade/epic-landing-bronze/epic-landing-bronze.md'
 warnings: []
-deferred: []
+deferred:
+  - summary: >-
+      Nine demo CSVs were wrongly quarantined by the first live batch, before the per-file run_id fix.
+    evidence: |-
+      Batch mode shared one run_id, so the gate counted other files' branch rows. Bronze main was untouched. The files stay quarantined until E4 replay (quarantined -> landed).
+    location: >-
+      demo ops.file_lifecycle
+    severity: medium
+  - summary: >-
+      The demo unmarked.csv has a plain landed row from before the refusal-detail fix, so every demo batch re-refuses it and exits 3.
+    evidence: |-
+      The fix only writes refusal detail for objects with no lifecycle rows. Remedy: append one landed row with {"refused":"unmarked"} for that URI (owner decision on a manual ops write).
+    location: >-
+      ingestion/discover.py pending
+    severity: medium
+  - summary: >-
+      Discovery lists the whole bucket and passes all URIs as one bq array parameter, which will hit ARG_MAX or parameter limits as landing grows.
+    evidence: |-
+      list_landing uses gs://bucket/** and rows_for_uris sends a single --parameter with no chunking.
+    location: >-
+      ingestion/discover.py, ingestion/lifecycle.py rows_for_uris
+    severity: medium
 ---
 
 <intent-contract>
@@ -83,6 +104,25 @@ deferred: []
 ## Plan Change Log
 
 ## Review Triage Log
+
+### 2026-10-08 — Review pass
+- verdicts: 6 findings — high 0, medium 4, low 2, false 0, maybe-false 0
+- findings:
+  - `medium` `patch` A bare "412" matched the sha, so other cp errors were labelled overwrites. Fixed: PRECONDITION_RE; test added.
+  - `medium` `patch` An unmarked file was retried forever and batches exited nonzero. Fixed: the refusal detail on the landed row excludes it from pending; two-run test.
+  - `medium` `patch` A copy's discovery-only landed row could make the original rejected_duplicate. Fixed: the original must be past landed or landed earlier; test added.
+  - `medium` `defer` Discovery lists the whole bucket and sends one unbounded bq parameter. Needs chunking or prefix-scoping later.
+  - `low` `patch` land_dir landed dot-files and aborted on the first cp error. Fixed: dot-files are skipped, errors are per-file, exit nonzero.
+  - `low` `reject` upload_landing loses the original stderr on a lost race. Error text only; the behavior is unchanged.
+
+## Auto Run Result
+
+- Summary: `make land` lands files under AD-3 with overwrite rejection. `make bronze` with no FILE discovers pending objects by bucket listing joined to ops.file_lifecycle, handles rejected_duplicate and unmarked refusal, and loads the rest through WAP with a per-file run_id.
+- Files: datagen/upload.py (land_file), ingestion/land.py, ingestion/discover.py, ingestion/lifecycle.py, ingestion/__main__.py, Makefile, tests.
+- Review: 4 patched (3 medium, 1 low), 1 deferred plus 2 incident items deferred, 1 rejected.
+- Follow-up review recommended: true. Three medium patches changed discovery and duplicate semantics and are not re-run live on demo.
+- Verification: pytest ingestion pipeline config datagen gave 263 passed. make validate passed. Before the patches, demo live showed an overwrite rejected, the copy rejected_duplicate, the edited file reconciled, and the unmarked file refused.
+- Residual risk: 9 demo files are wrongly quarantined, demo batches exit 3 until the unmarked row is remediated, and the IAM grant is still unapplied.
 
 ## Design Notes
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -24,6 +25,10 @@ def _sha_landed(run: Runner, prefix: str, sha: str) -> bool:
 
 
 LANDED, REJECTED_OVERWRITE = "landed", "rejected_overwrite"
+# gcloud's generation-precondition failure; a bare "412" would also match inside a sha in the URL.
+PRECONDITION_RE = re.compile(
+    r"(?i)precondition(?:\s|_)?(?:failed|not met)|\b(?:HTTP(?:Error)?|status|code)[\s:=]*412\b"
+)
 
 
 def landing_uri(bucket: str, source: str, feed: str, ingest_date: str, sha: str, name: str) -> str:
@@ -44,7 +49,7 @@ def land_file(
               capture_output=True, text=True, check=False)  # fmt: skip
     if res.returncode == 0:
         return LANDED, target
-    if "412" in (res.stderr or "") or "precondition" in (res.stderr or "").lower():
+    if PRECONDITION_RE.search(res.stderr or ""):
         return REJECTED_OVERWRITE, target
     raise UploadError(f"upload failed for {path.name}: {(res.stderr or '').strip()}")
 

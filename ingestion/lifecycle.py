@@ -89,30 +89,37 @@ def quarantine(
 
 def rows_for_uris(
     *, project_id: str, max_bytes_billed: int, uris: list[str], run: Runner = subprocess.run
-) -> dict[str, list[str]]:
-    """{object_uri: [state, ...] oldest first} for the given landing URIs (discovery join)."""
+) -> dict[str, list[dict]]:
+    """{object_uri: [{state, refused}, ...] oldest first} for the given landing URIs (discovery join)."""
     if not uris:
         return {}
-    sql = (f"SELECT object_uri, state FROM `{project_id}.ops.file_lifecycle` "
+    sql = (f"SELECT object_uri, state, JSON_VALUE(detail, '$.refused') AS refused "
+           f"FROM `{project_id}.ops.file_lifecycle` "
            "WHERE object_uri IN UNNEST(@uris) ORDER BY recorded_at")  # fmt: skip
     param = f"--parameter=uris:ARRAY<STRING>:{json.dumps(uris)}"
     out = run([*bq_query_args(project_id, max_bytes_billed), "--format=json", param, sql],
               check=True, capture_output=True, text=True).stdout  # fmt: skip
     rows = json.loads(out) if out.lstrip().startswith("[") else []
-    found: dict[str, list[str]] = {}
+    found: dict[str, list[dict]] = {}
     for r in rows:
-        found.setdefault(r["object_uri"], []).append(r["state"])
+        found.setdefault(r["object_uri"], []).append({"state": r["state"], "refused": r.get("refused")})
     return found
 
 
 def sha_seen_elsewhere(
     *, project_id: str, max_bytes_billed: int, file_sha256: str, object_uri: str, run: Runner = subprocess.run
 ) -> bool:
-    """AD-3 duplicate: this sha has lifecycle rows under another object_uri that was not itself rejected_duplicate."""
-    sql = (f"SELECT COUNT(*) AS n FROM `{project_id}.ops.file_lifecycle` "
-           "WHERE file_sha256 = @sha AND object_uri != @uri AND object_uri NOT IN ("
-           f"SELECT object_uri FROM `{project_id}.ops.file_lifecycle` "
-           "WHERE file_sha256 = @sha AND state = 'rejected_duplicate')")  # fmt: skip
+    """AD-3 duplicate: another object_uri with this sha is the original.
+
+    It counts only if it was not itself rejected_duplicate and either got past `landed` or recorded its
+    first `landed` before this URI did (a copy's discovery-only `landed` row never outranks an older original).
+    """
+    sql = (f"WITH o AS (SELECT object_uri, LOGICAL_OR(state = 'rejected_duplicate') AS dup, "
+           "LOGICAL_OR(state != 'landed') AS past, MIN(IF(state = 'landed', recorded_at, NULL)) AS first_landed "
+           f"FROM `{project_id}.ops.file_lifecycle` WHERE file_sha256 = @sha GROUP BY object_uri), "
+           "me AS (SELECT MIN(first_landed) AS t FROM o WHERE object_uri = @uri) "
+           "SELECT COUNT(*) AS n FROM o, me WHERE o.object_uri != @uri AND NOT o.dup "
+           "AND (o.past OR me.t IS NULL OR o.first_landed < me.t)")  # fmt: skip
     args = [*bq_query_args(project_id, max_bytes_billed), "--format=json",
             f"--parameter=sha:STRING:{file_sha256}", f"--parameter=uri:STRING:{object_uri}"]  # fmt: skip
     out = run([*args, sql], check=True, capture_output=True, text=True).stdout

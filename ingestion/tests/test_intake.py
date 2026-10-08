@@ -68,6 +68,7 @@ class FakeOps:
 
         def record(**kw):
             self.rows.append({"sha": kw["file_sha256"], "uri": kw["object_uri"], "state": kw["state"],
+                              "refused": kw["detail"].get("refused"), "at": len(self.rows),
                               "table": kw["detail"].get("table"), "branch": kw["detail"].get("branch")})  # fmt: skip
 
         def latest_states(**kw):
@@ -79,13 +80,22 @@ class FakeOps:
             out: dict = {}
             for r in self.rows:
                 if r["uri"] in kw["uris"]:
-                    out.setdefault(r["uri"], []).append(r["state"])
+                    out.setdefault(r["uri"], []).append({"state": r["state"], "refused": r["refused"]})
             return out
 
         def sha_seen_elsewhere(**kw):
-            rejected = {r["uri"] for r in self.rows if r["state"] == "rejected_duplicate"}
-            return any(r["sha"] == kw["file_sha256"] and r["uri"] != kw["object_uri"] and r["uri"] not in rejected
-                       for r in self.rows)  # fmt: skip
+            mine = [r for r in self.rows if r["sha"] == kw["file_sha256"]]
+            rejected = {r["uri"] for r in mine if r["state"] == "rejected_duplicate"}
+
+            def first_landed(u):
+                return min((r["at"] for r in mine if r["uri"] == u and r["state"] == "landed"), default=None)
+
+            me = first_landed(kw["object_uri"])
+            for u in {r["uri"] for r in mine} - rejected - {kw["object_uri"]}:
+                past = any(r["state"] != "landed" for r in mine if r["uri"] == u)
+                if past or me is None or first_landed(u) < me:
+                    return True
+            return False
 
         mp.setattr(lc, "record", record)
         mp.setattr(lc, "latest_states", latest_states)
@@ -256,8 +266,9 @@ def test_unmarked_landed_once_refused_no_bronze_batch_continues(env, capsys):
     assert env["ops"].states(ug)[-1] == "reconciled"
     assert any(x["event"] == "refused_unmarked" for x in lines)
     assert lines[-1]["failed"] == [uu]
-    code, _ = batch(capsys)  # rerun: refused again, still exactly one `landed`
-    assert code == 3 and env["ops"].states(uu) == ["landed"]
+    code, lines = batch(capsys)  # rerun, nothing new: the refusal is terminal, exit 0, still one `landed`
+    assert code == 0 and env["ops"].states(uu) == ["landed"]
+    assert next(x for x in lines if x["event"] == "discovered")["pending"] == 0
 
 
 def test_non_csv_skipped_without_lifecycle_row(env, capsys):
@@ -306,3 +317,59 @@ def test_each_file_in_a_batch_gets_its_own_run_id(env, monkeypatch, capsys):
     )
     assert batch(capsys)[0] == 0
     assert len(set(runs)) == 2
+
+
+def test_original_processed_after_copy_discovered_is_not_a_duplicate(env, capsys):
+    data = marked()
+    orig, copy = uri_for(data, "members.csv"), uri_for(data, "members_copy.csv")
+    sha = hashlib.sha256(data).hexdigest()
+    ops = env["ops"]
+    # original landed first; the copy then got a discovery-only `landed` row
+    for u in (orig, copy):
+        ops.rows.append({"sha": sha, "uri": u, "state": "landed", "refused": None, "at": len(ops.rows),
+                         "table": None, "branch": None})  # fmt: skip
+    env["gcs"].objects[orig] = data
+    assert cli.load(CFG, orig, "r1")["table"]
+    assert ops.states(orig)[-1] == "reconciled"
+    env["gcs"].objects[copy] = data
+    assert cli.load(CFG, copy, "r2")["skipped"] == "rejected_duplicate"
+    assert ops.states(copy) == ["landed", "rejected_duplicate"]
+
+
+def _cp_fail(stderr):
+    return lambda args, **kw: subprocess.CompletedProcess(args, 1, "", stderr)
+
+
+def test_land_file_412_inside_sha_is_not_an_overwrite(tmp_path):
+    from datagen.upload import REJECTED_OVERWRITE, UploadError, land_file
+
+    f = tmp_path / "x.csv"
+    f.write_bytes(b"a")
+    url = "gs://b/source=s/feed=f/ingest_date=d/sha256=ab412cd/x.csv"
+    with pytest.raises(UploadError):
+        land_file(f, "s", "f", "b", "d", _cp_fail(f"ERROR: HTTPError 403: denied for {url}"), sha="ab412cd")
+    with pytest.raises(UploadError):
+        land_file(f, "s", "f", "b", "d", _cp_fail(f"ERROR: connection reset copying to {url}"), sha="ab412cd")
+    status, _ = land_file(f, "s", "f", "b", "d", _cp_fail(f"ERROR: HTTPError 412: {url} Precondition Failed"),
+                          sha="ab412cd")  # fmt: skip
+    assert status == REJECTED_OVERWRITE
+
+
+def test_land_dir_skips_dotfiles_and_continues_after_failure(tmp_path, env, capsys):
+    d = tmp_path / "payer_b" / "members"
+    d.mkdir(parents=True)
+    (d / ".DS_Store").write_bytes(b"x")
+    (d / "a.csv").write_bytes(marked())
+    (d / "b.csv").write_bytes(marked(HEADER + b"\nM7\n"))
+    gcs = env["gcs"]
+
+    def run(args, **kw):
+        if args[-2].endswith("a.csv"):
+            return subprocess.CompletedProcess(args, 1, "", "HTTPError 403: denied")
+        return gcs.run(args, **kw)
+
+    lines = []
+    out = land.land_dir(tmp_path, BUCKET, "2026-10-08", lambda e, **f: lines.append({"event": e, **f}), run=run)
+    assert out["failed"] == ["payer_b/members/a.csv"] and len(out["landed"]) == 1
+    assert not any(".DS_Store" in u for u in gcs.objects)
+    assert [x["event"] for x in lines] == ["land_failed", "land_landed"]

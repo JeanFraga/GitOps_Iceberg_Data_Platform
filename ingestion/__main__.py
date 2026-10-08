@@ -101,7 +101,7 @@ def load(cfg: dict, uri: str, run_id: str, table_suffix: str = "") -> dict:
     # This object goes landed -> rejected_duplicate (terminal); the original keeps its own state.
     if lifecycle.sha_seen_elsewhere(project_id=project, max_bytes_billed=cap, file_sha256=sha, object_uri=uri):
         own = lifecycle.rows_for_uris(project_id=project, max_bytes_billed=cap, uris=[uri]).get(uri, [])
-        if "rejected_duplicate" not in own:
+        if not any(r["state"] == "rejected_duplicate" for r in own):
             dup = {"project_id": project, "max_bytes_billed": cap, "file_sha256": sha, "object_uri": uri,
                    "source": source, "feed": feed, "run_id": run_id, "storage_class": None}  # fmt: skip
             if not own:
@@ -217,13 +217,16 @@ def exit_code(exc: BaseException) -> int:
     return 1
 
 
-def record_discovered_landed(cfg: dict, uri: str, run_id: str) -> None:
-    """Discovery records `landed` once for a listed object with no lifecycle row, before any marker check."""
+def record_refused_landed(cfg: dict, uri: str, run_id: str) -> None:
+    """Batch: an unmarked object with no lifecycle row gets one `landed` row carrying the refusal.
+
+    lifecycle.yaml has no refused state; discovery skips a `landed` row with detail.refused, so a rerun
+    does not refuse (and fail) the same object again."""
     m = URI_RE.match(uri)
     lifecycle.record(project_id=cfg["project_id"], max_bytes_billed=cfg["cost"]["max_bytes_billed"],
                      file_sha256=m["sha"], object_uri=uri, source=m["source"], feed=m["feed"], state="landed",
-                     run_id=run_id, storage_class=None, detail={"discovered": True})  # fmt: skip
-    log("landed", object_uri=uri, file_sha256=m["sha"], run_id=run_id, discovered=True)
+                     run_id=run_id, storage_class=None, detail={"discovered": True, "refused": "unmarked"})  # fmt: skip
+    log("landed", object_uri=uri, file_sha256=m["sha"], run_id=run_id, discovered=True, refused="unmarked")
 
 
 def run_batch(cfg: dict, run_id: str, table_suffix: str = "") -> dict:
@@ -241,9 +244,12 @@ def run_batch(cfg: dict, run_id: str, table_suffix: str = "") -> dict:
         # in one table would be counted together. The batch lock stays held under the batch run_id.
         file_run = runner.mint_run_id(datetime.now(UTC))
         try:
-            if not has_rows:
-                record_discovered_landed(cfg, uri, file_run)
-            out = load(cfg, uri, file_run, table_suffix)
+            try:
+                out = load(cfg, uri, file_run, table_suffix)
+            except UnmarkedFile:
+                if not has_rows:
+                    record_refused_landed(cfg, uri, file_run)
+                raise
             (summary["skipped"] if out.get("skipped") else summary["loaded"]).append(uri)
         except Exception as exc:  # noqa: BLE001 - per-file isolation; logged type-only
             log("file_failed", object_uri=uri, run_id=file_run, batch_run_id=run_id)
@@ -269,8 +275,9 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001 - type only
             log("error", error_type=type(exc).__name__, error="land failed")
             return 1
-        log("land_done", landed=len(out["landed"]), rejected_overwrite=len(out["rejected_overwrite"]))
-        return 0
+        log("land_done", landed=len(out["landed"]), rejected_overwrite=len(out["rejected_overwrite"]),
+            failed=out["failed"])  # fmt: skip
+        return 1 if out["failed"] else 0
     backend = runner.BigQueryBackend(cfg["project_id"], cfg["cost"]["max_bytes_billed"])
     result: dict = {}
     if not args.file:

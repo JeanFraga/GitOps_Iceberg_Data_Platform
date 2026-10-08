@@ -10,20 +10,26 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from datagen.upload import LANDED, land_file
+from datagen.upload import LANDED, UploadError, land_file
 
 Log = Callable[..., None]
 
 
 def land_dir(src: Path, bucket: str, ingest_date: str, log: Log, run=subprocess.run) -> dict:
-    """Returns {"landed": [uri], "rejected_overwrite": [uri]}."""
+    """Returns {"landed": [uri], "rejected_overwrite": [uri], "failed": [path]}. Dot-files are skipped."""
     if not src.is_dir():
         raise FileNotFoundError(f"SRC is not a directory: {src}")
-    out: dict[str, list[str]] = {"landed": [], "rejected_overwrite": []}
-    for path in sorted(p for p in src.glob("*/*/*") if p.is_file()):
+    out: dict[str, list[str]] = {"landed": [], "rejected_overwrite": [], "failed": []}
+    files = (p for p in src.glob("*/*/*") if p.is_file())
+    for path in sorted(p for p in files if not any(part.startswith(".") for part in p.relative_to(src).parts)):
         feed_dir = path.parent
         source, feed = feed_dir.parent.name, feed_dir.name
-        status, uri = land_file(path, source, feed, bucket, ingest_date, run)
+        try:
+            status, uri = land_file(path, source, feed, bucket, ingest_date, run)
+        except UploadError:
+            out["failed"].append(str(path.relative_to(src)))
+            log("land_failed", path=str(path.relative_to(src)))  # no stderr: keep the line value-free
+            continue
         if status == LANDED:
             out["landed"].append(uri)
             log("land_landed", uri=uri)
