@@ -3,7 +3,7 @@ title: 'Cost guardrails and teardown'
 type: 'feature'
 ticket: '8'
 created: '2026-10-08'
-status: 'in-progress'
+status: blocked
 baseline_revision: 'e7e9e224f07dcb266c7290580cfbf1f26d3245f1'
 route: 'full'
 route_source: 'auto'
@@ -16,6 +16,8 @@ followup_review_recommended: false
 context: []
 warnings: []
 deferred: []
+blocked_at: "2026-10-08"
+blocked_reason: "Code committed; live steps denied by auto-mode classifier (Blind Apply). User runs: make budget (x2), make teardown, make apply, terraform plan clean, check_schemas.sh; then review and mark done"
 ---
 
 <intent-contract>
