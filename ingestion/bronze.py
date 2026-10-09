@@ -9,7 +9,7 @@ from __future__ import annotations
 import csv
 from datetime import datetime
 
-from ingestion.records import Record
+from ingestion.records import Record, x12_element_separator
 
 REST_URI = "https://biglake.googleapis.com/iceberg/v1/restcatalog"
 CATALOG = "bronze_cat"  # Spark-side alias; the BigLake catalog name is the warehouse bucket
@@ -111,7 +111,7 @@ def build_rows(
     else:
         raise BronzeError(f"unsupported format {fmt}")
     # X12 element separator is ISA byte 4 (the first record is ISA).
-    x12_sep = records[0].raw[3:4].decode("utf-8", errors="replace") if fmt == "x12" and records else "*"
+    x12_sep = x12_element_separator(records[0].raw) if fmt == "x12" and records else "*"
     rows = []
     for rec in data_records(records, fmt):
         if rec.encoding != "utf-8":

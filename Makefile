@@ -45,6 +45,9 @@ samples: resolve ## FR-37: regenerate committed datagen/samples/ (repo_weight.sa
 repo-weight: ## FR-37: fail on committed data files over the record/byte limit outside datagen/samples/. PATH=dir
 	$(GUARD) repo-weight $(SCAN_PATH)
 
+edi-preparse-check: ## AD-4: regenerate the X12 pre-parse twice per sample; fail on any diff vs ingestion/edi/tests/golden/
+	$(UV) run python -m ingestion.edi.check
+
 FILE ?=
 TRACER_SAMPLE := datagen/samples/payer_b/members/payer_b_members_2024.csv
 
@@ -118,6 +121,6 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 		echo "tflint not installed; skipping"; \
 	fi
 
-validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check repo-weight tf-validate tflint ## Run all local checks (later entries append targets here)
+validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check repo-weight edi-preparse-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: bronze land bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: edi-preparse-check bronze land bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate

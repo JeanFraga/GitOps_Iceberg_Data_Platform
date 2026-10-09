@@ -79,6 +79,11 @@ def _split_x12(data: bytes) -> list[Record]:
     return [Record(i, s) for i, s in enumerate((s for s in segs if s), start=1)]
 
 
+def x12_element_separator(isa: bytes) -> str:
+    """X12 element separator: ISA byte 4 of the ISA record (or of the raw stream)."""
+    return isa[3:4].decode("utf-8", errors="replace")
+
+
 def _blank(raw: bytes) -> bool:
     """Blank as config/fingerprint.py sees it (str.strip after UTF-8 decode); undecodable is never blank."""
     try:
