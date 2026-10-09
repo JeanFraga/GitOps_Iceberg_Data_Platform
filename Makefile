@@ -56,6 +56,9 @@ SRC ?=
 bronze: resolve ## Load landed files into Bronze Iceberg and ops.file_lifecycle. FILE=gs://... for one; empty FILE discovers all pending
 	$(UV) run python -m ingestion --profile $(PROFILE) $(if $(FILE),--file $(FILE)) $(if $(TABLE_SUFFIX),--table-suffix $(TABLE_SUFFIX))
 
+reconcile-storage: resolve ## Record landing storage-class moves (STANDARD/COLDLINE/ARCHIVE) in ops.file_lifecycle
+	$(UV) run python -m ingestion.storage_class --profile $(PROFILE)
+
 land: resolve ## Land SRC/<source>/<feed>/<file> immutably under AD-3 (overwrite rejected and logged). SRC=dir required
 	@test -n "$(SRC)" || { echo "error: SRC=<dir with <source>/<feed>/<file>> is required"; exit 1; }
 	$(UV) run python -m ingestion --profile $(PROFILE) --land $(SRC)
@@ -123,4 +126,4 @@ tflint: ## TFLint over infra/ (skipped if tflint is not installed)
 
 validate: lint test validate-config lint-bytes-cap check-resolved phi-scan marker-check repo-weight edi-preparse-check tf-validate tflint ## Run all local checks (later entries append targets here)
 
-.PHONY: edi-preparse-check bronze land bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
+.PHONY: reconcile-storage edi-preparse-check bronze land bronze-tracer-land samples repo-weight generate generate-upload run-stub help upgrade apply teardown budget lint-bytes-cap tf-bootstrap tf-plan tf-apply phi-scan marker-check resolve validate-config check-resolved lint test tf-validate tflint validate
